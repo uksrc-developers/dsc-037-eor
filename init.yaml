@@ -1,0 +1,9 @@
+datafolder : './data/'
+datafile : 'hyp_1184702048_ionosub_ssins_30l_src8k_300it_8s_80kHz_i1000.uvfits'
+dataset : 'MWA'
+
+pol : -5
+time_range : None
+freq_range : [175.075, 183.075]
+
+antenna_nums : [40]
