@@ -50,14 +50,15 @@ def load_config(config_file, verbose=False):
         cfg['Ntimes'] = uvd_meta.Ntimes
         if verbose:
             print(f'No times specified; using all timestamps in data ({cfg["Ntimes"]}).')
+    # format frequency range
+    cosmo = hp.conversions.Cosmo_Conversions()
+    cfg['avg_z'] = cosmo.f2z(np.mean(cfg['freq_range'])*1e6)
 
     # Print out loaded configuration
     if verbose:
         print(f'Loaded {cfg["dataset"]} dataset with required configuration.')
-        cosmo = hp.conversions.Cosmo_Conversions()
-        avg_z = cosmo.f2z(np.mean(cfg['freq_range'])*1e6)
         print(f'Selected frequency range: {cfg["freq_range"]} MHz,'
-              f' corresponding to average redshift of {avg_z:.2f}.')
+              f' corresponding to average redshift of {cfg["avg_z"]:.1f}.')
         print(f'Selected polarization: {cfg["pol"]} ({pyuvdata.utils.polnum2str(cfg["pol"])})') 
 
     return cfg
