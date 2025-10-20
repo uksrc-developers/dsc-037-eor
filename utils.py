@@ -41,6 +41,7 @@ def load_config(config_file, verbose=False):
         avg_z = cosmo.f2z(np.mean(cfg['freq_range'])*1e6)
         print(f'Selected frequency range: {cfg["freq_range"]} MHz,'
               f' corresponding to average redshift of {avg_z:.2f}.')
+        print(f'Selected polarization: {cfg["pol"]} ({pyuvdata.utils.polnum2str(cfg["pol"])})') 
 
     return cfg
 
