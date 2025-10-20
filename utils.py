@@ -33,6 +33,23 @@ def load_config(config_file, verbose=False):
     replace(cfg)
     if isinstance(cfg['pol'], str):
         cfg['pol'] = pyuvdata.utils.str2polnum(cfg['pol'])
+    # check data file
+    uvd_meta = pyuvdata.UVData()
+    uvd_meta.read_uvfits(os.path.join(cfg['datafolder'], cfg['datafile']), read_data=False)
+    # format antenna list
+    if cfg['antenna_nums'] is None:
+        cfg['antenna_nums'] = np.unique(uvd_meta.ant_1_array)
+        if verbose:
+            print(f'No antennas specified; using all antennas in data ({cfg["antenna_nums"].size}).')
+    cfg['antenna_nums'] = np.atleast_1d(cfg['antenna_nums'])
+    # format time range
+    if cfg['time_range'] is not None:
+        uvd_meta.select(time_range=cfg['time_range'])
+        cfg['Ntimes'] = uvd_meta.Ntimes
+    else:
+        cfg['Ntimes'] = uvd_meta.Ntimes
+        if verbose:
+            print(f'No times specified; using all timestamps in data ({cfg["Ntimes"]}).')
 
     # Print out loaded configuration
     if verbose:
