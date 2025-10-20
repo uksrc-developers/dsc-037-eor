@@ -1,0 +1,11 @@
+[PowerSpectraConfig]
+window_fct=blackmanharris
+rmean_freqs=False
+umin=10
+umax=100
+du=5
+ft_method='lssa'
+empirical_weighting=False
+empirical_weighting_polyfit_deg=2
+primary_beam=ant_4.4_1.0_gaussian
+kbins_n=8

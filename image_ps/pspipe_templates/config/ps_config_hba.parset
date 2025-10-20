@@ -1,0 +1,10 @@
+[PowerSpectraConfig]
+window_fct=hann
+rmean_freqs=false
+umin=50
+umax=250
+du=8
+empirical_weighting=False
+empirical_weighting_polyfit_deg=2
+primary_beam=lofar_hba
+kbins_n=8

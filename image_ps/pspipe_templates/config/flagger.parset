@@ -1,0 +1,12 @@
+[frequency_weights]
+type=FreqsWeightsFlagger
+action=filter
+ratio=0.3
+
+[uv_weights]
+type=UVWeightsFlagger
+action=filter
+threshold=0.02
+ 
+[flagger]
+pipeline=frequency_weights,uv_weights

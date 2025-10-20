@@ -1,0 +1,18 @@
+longitude = 6.57
+
+[image]
+umin = 30
+umax = 500
+scale = '0.5amin'
+size = '1024 1024'
+
+[vis_cube]
+fov = 4
+umin = 50
+umax = 250
+win_fct = '(tukey,0.2)'
+
+[power_spectra]
+ps_config = 'config/ps_config_hba.parset'
+flagger = 'config/flagger.parset'
+eor_bin_list = 'config/eor_bins.parset'
