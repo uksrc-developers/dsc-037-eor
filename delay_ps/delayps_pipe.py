@@ -61,7 +61,7 @@ def load_config(config_file, verbose=False):
         raise NotImplementedError("Custom beamfile reading not implemented yet.")
     # turn string pol to int
     if isinstance(cfg['pol'], str):
-        cfg['pol'] = pyuvdata.utils.str2polnum(cfg['pol'])
+        cfg['pol'] = pyuvdata.utils.polstr2num(cfg['pol'])
     # for measurement set, specify data column
     if cfg['data_col'] is None:
         if os.path.splitext(cfg['datafile']) in ['.ms', '.MS']:
