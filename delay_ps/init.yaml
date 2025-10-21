@@ -1,0 +1,12 @@
+datafolder : './data/'
+datafile : 'hyp_1184702048_ionosub_ssins_30l_src8k_300it_8s_80kHz_i1000.uvfits'
+dataset : 'MWA'
+
+# The polarizations numbers to include when reading data into the object
+pol : -5
+# The time range in Julian Date to include when reading data into the object, must be length 2. If None, all times in datafile are used.
+time_range : None
+# The range of frequencies to include when reading data into the object (min and max only), in MHz.
+freq_range : [175.075, 183.075]
+# The antennas numbers to include when reading data into the object. If None, all antennas are considered.
+antenna_nums : None
