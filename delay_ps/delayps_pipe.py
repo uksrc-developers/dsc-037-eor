@@ -72,9 +72,8 @@ def load_config(config_file, verbose=False):
             cfg['data_col'] = None
     # check data file
     uvd_meta = pyuvdata.UVData()
-    uvd_meta.read(os.path.join(cfg['datafolder'], cfg['datafile']), read_data=False)
-    # find indices to select frequency range (use in hp.pspec)
-    cfg['spw_ranges'] = [tuple([list(uvd_meta.freq_array).index(cfg['freq_range'][i]*1e6) for i in (0, 1)])]
+    uvd_meta.read(os.path.join(cfg['datafolder'], cfg['datafile']), read_data=False, data_column=cfg['data_col'])
+    # TODO: read_data=False does not work with measurement sets
     # format antenna list
     if cfg['antenna_nums'] is None:
         cfg['antenna_nums'] = np.unique(uvd_meta.ant_1_array)
@@ -91,7 +90,8 @@ def load_config(config_file, verbose=False):
             print(f'No times specified; using all timestamps in data ({cfg["Ntimes"]}).')
     # format frequency range
     cosmo = hp.conversions.Cosmo_Conversions()
-    cfg['avg_z'] = cosmo.f2z(np.mean(cfg['freq_range'])*1e6)
+    frequencies = np.array([uvd_meta.freq_array[cfg['freq_range'][i]] for i in [0,1]])/1e6  # MHz
+    cfg['avg_z'] = cosmo.f2z(np.mean(frequencies)*1e6)
 
     # Print out loaded configuration
     if verbose:
@@ -102,7 +102,7 @@ def load_config(config_file, verbose=False):
         print(f' Number of frequencies: {uvd_meta.Nfreqs}')
         print(f' Number of polarizations: {uvd_meta.Npols} ({uvd_meta.polarization_array})')
         print('Analysis choices:')
-        print(f' Selected frequency range: {cfg["freq_range"]} MHz,'
+        print(f' Selected frequency range: {frequencies} MHz,'
               f' corresponding to average redshift of {cfg["avg_z"]:.1f}.')
         print(f' Selected polarization: {cfg["pol"]} ({pyuvdata.utils.polnum2str(cfg["pol"])})') 
 
@@ -139,22 +139,22 @@ def bl_avg_delayps_per_antenna(dic, fig_folder):
 
     # Build delay power spectra, but only for baselines including a specific antenna.
     # loop over antennas to build delay power spectra
-    data_time_avg = np.zeros((len(dic['antenna_nums']), np.diff(dic['spw_ranges'][0])[0]//2-1))
-    data_per_antenna = np.zeros((len(dic['antenna_nums']), dic['Ntimes'], np.diff(dic['spw_ranges'][0])[0]//2-1))
+    data_time_avg = np.zeros((len(dic['antenna_nums']), np.diff(dic['freq_range'])[0]//2-1))
+    data_per_antenna = np.zeros((len(dic['antenna_nums']), dic['Ntimes'], np.diff(dic['freq_range'])[0]//2-1))
     for u, antenna_num in enumerate(tqdm(dic['antenna_nums'])):
         # create UVData object and read in data
         uvd = pyuvdata.UVData()
+        # selection when reading data not available for MS
+        # TODO: optimise to avoid re-loading full data each time
         uvd.read(
             os.path.join(dic['datafolder'], dic['datafile']),
-            polarizations=[dic['pol']],
-            time_range=dic['time_range'],
-            # freq_chans=np.arange(spw_ranges[0][0], spw_ranges[0][1]),
             keep_all_metadata=False,
             read_data=True,
             data_column=dic['data_col'],
         )
         # select data for a single antenna
         uvd.select(ant_str=f'{antenna_num}')
+        uvd.select(polarizations=[dic['pol']], time_range=dic['time_range'],)
         # average over all the baselines including said antenna
         uvd.compress_by_redundancy(tol=100000., use_grid_alg=True)
         # Create a new PSpecData object which will be used to compute the delay PS
@@ -166,7 +166,7 @@ def bl_avg_delayps_per_antenna(dic, fig_folder):
             [bl], [bl],  # select the baselines to cross (here, with itself)
             dsets=(0, 1),  # select which datasets to use within ds
             pols=[(dic['pol'], dic['pol'])],  # select the polarisation channels to cross
-            spw_ranges=dic['spw_ranges'],  # select a smaller bandwidth
+            spw_ranges=[tuple(dic['freq_range'])],  # select a smaller bandwidth
             verbose=False
         )
         # save time array for per-antenna figure
@@ -283,7 +283,7 @@ def time_average_delayps_across_blens(dic, fig_folder, max_bl_len=30., bl_tol=1.
         bls1, bls2,
         dsets=(0, 1),
         pols=[(dic['pol'], dic['pol'])],
-        spw_ranges=dic['spw_ranges'],  # select a smaller bandwidth
+        spw_ranges=[tuple(dic['freq_range'])],  # select a smaller bandwidth
         verbose=False
     )
 
@@ -323,7 +323,7 @@ def main(config_file):
 
     # Compute a delay power spectrum for a single antenna (and all associated baselines) 
     # Produce corresponding figures
-    bl_avg_delayps_per_antenna(dic, root)
+    # bl_avg_delayps_per_antenna(dic, root)
 
     # Compute a time-averaged delay power spectrum across redundant baselines
     time_average_delayps_across_blens(dic, root, max_bl_len=30., bl_tol=1., verbose=True)
