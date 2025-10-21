@@ -56,7 +56,7 @@ def load_config(config_file, verbose=False):
 
     # Print out loaded configuration
     if verbose:
-        print(f'Loaded {cfg["dataset"]} dataset with required configuration.')
+        print(f'Loaded {cfg["instrument"]} dataset with required configuration.')
         print(f'Selected frequency range: {cfg["freq_range"]} MHz,'
               f' corresponding to average redshift of {cfg["avg_z"]:.1f}.')
         print(f'Selected polarization: {cfg["pol"]} ({pyuvdata.utils.polnum2str(cfg["pol"])})') 
