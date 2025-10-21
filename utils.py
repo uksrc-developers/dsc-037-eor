@@ -31,11 +31,17 @@ def load_config(config_file, verbose=False):
 
     # Replace entries
     replace(cfg)
+    # turn string pol to int
     if isinstance(cfg['pol'], str):
         cfg['pol'] = pyuvdata.utils.str2polnum(cfg['pol'])
+    # for measurement set, specify data column
+    if cfg['data_col'] is None:
+        cfg['data_col'] = 'DATA'
+        if verbose and os.path.splitext(cfg['datafile']) in ['.ms', '.MS']:
+            print(f'No data column specified; using default column: {cfg["data_col"]}.')
     # check data file
     uvd_meta = pyuvdata.UVData()
-    uvd_meta.read_uvfits(os.path.join(cfg['datafolder'], cfg['datafile']), read_data=False)
+    uvd_meta.read(os.path.join(cfg['datafolder'], cfg['datafile']), read_data=False)
     # format antenna list
     if cfg['antenna_nums'] is None:
         cfg['antenna_nums'] = np.unique(uvd_meta.ant_1_array)
