@@ -1,6 +1,6 @@
 datafolder : '../../data/'
 datafile : 'L253456_SAP000_002_time1.flagged.5ch8s.dical.MS'
-dataset : 'lofar'
+instrument : 'lofar'
 
 # The polarizations numbers to include when reading data into the object
 pol : 'XX'

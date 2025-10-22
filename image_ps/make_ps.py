@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 from pspipe import database, settings
 
-mpl.rcParams['image.cmap'] = 'twilight'
+mpl.rcParams['image.cmap'] = 'Spectral_r'
 mpl.rcParams['image.origin'] = 'lower'
 mpl.rcParams['image.interpolation'] = 'nearest'
 mpl.rcParams['axes.grid'] = True
@@ -76,12 +76,12 @@ def main(rev_file, obs_id, fmin, fmax, pol):
         # Plot and save 1D PS
         fig, ax = plt.subplots(figsize=(6, 5))
         ps1d.plot(ax=ax, label=pol_name)
-        ax.set_title(f"1D Power Spectrum – {pol_name}\n{obs_id}")
+        ax.set_title(f"Angular Power Spectrum – {pol_name}\n{obs_id}")
         ax.legend()
-        outfile = outdir / f"{obs_id}_{rev.settings.image.name}_{pol_name}_ps1d.pdf"
+        outfile = outdir / f"{obs_id}_{rev.settings.image.name}_{pol_name}_ang_ps.pdf"
         fig.savefig(outfile)
         plt.tight_layout()
-        click.echo(f"Saved Stokes {pol_name} 1D PS figure to {outfile}")
+        click.echo(f"Saved Stokes {pol_name} Angular PS figure to {outfile}")
 
         # Plot and save Variance
         fig, ax = plt.subplots(figsize=(6, 5))
