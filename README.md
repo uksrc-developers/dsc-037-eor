@@ -10,8 +10,6 @@ This repository contains the implementation code for **DSC037**, including noteb
 | `plot-calibration-solutions.ipynb` | step 3  of the WT: calibration-solution QA | Opens complex gain solutions saved as FITS tables and plots the per-antenna, per-polarisation amplitude and phase versus frequency. Provides optional phase unwrapping and smoothness metrics to highlight jumps that may indicate cable reflections or calibration pathologies. |
 | `plot-rudimentary.ipynb` | step 3  of the WT: quick delay-spevctra inspection | Computes and plots rudimentary delay power spectra (FFT → absolute value → square). |
 
----
-
 ## Visibility-Based Delay Power Spectra
 
 A script uses **hera_pspec** (the HERA power-spectra pipeline) to compute visibility-based delay power spectra (step 4 of the WT).  
