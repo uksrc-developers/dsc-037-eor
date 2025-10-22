@@ -1,26 +1,60 @@
 # DSC-037: Cable Reflection Systematics for EoR Science
 
-This repository hosts three exploratory Jupyter notebooks produced for the
-[DSC-037](https://confluence.skatelescope.org/x/0rs6F) data-science challenge.  The
-material concentrates on steps 3 and 4 of the challenge workflow, where the goal is
-to assess the spectral smoothness of calibrated visibilities and to derive delay power
-spectra that highlight cable-reflection systematics in SKA-Low pathfinder data.
+This repository contains the implementation code for **DSC037**, including notebooks for quality assessment and scripts for visibility-based and image-based power spectra computation.
 
-## Notebook overview
+## Quality Assessment Notebooks
 
-| Notebook | Focus | Key capabilities |
-| --- | --- | --- |
-| `plot-vis.ipynb` | Challenge step 3: visibility inspection | Loads visibilities from LOFAR Measurement Sets (via `casacore`) or UVFITS/pyuvdata-compatible files and plots amplitude and phase versus time and frequency for individual baselines. Interactive controls let you choose polarisations, antennas, and plotting axes to verify temporal and spectral smoothness. |
-| `plot-calibration-solutions.ipynb` | Challenge step 3: calibration-solution QA | Opens complex gain solutions saved as FITS tables and plots the per-antenna, per-polarisation amplitude and phase versus frequency. Provides optional phase unwrapping and smoothness metrics to highlight jumps that may indicate cable reflections or calibration pathologies. |
- `plot-rudimentary.ipynb` | Challenge step 3: calibration-solution QA |  compute and plot rudimentary (FFT, absolute value, then square) delay power spectra. |
-| `bl-avg_delayps_per_antenna.ipynb` | Challenge step 4: delay power spectra per antenna | Builds time- and redundancy-averaged delay power spectra for all baselines that include a selected antenna. Uses `pyuvdata` to read visibilities and `hera_pspec` to form delay transforms, with options to filter by polarisation, time range, and maximum baseline length. |
-| `time-avg_delayps_across_blens.ipynb` | Challenge step 4: delay spectra across baseline lengths | Aggregates time-averaged delay power spectra across all baselines shorter than a configurable threshold, enabling cylindrical averaging by baseline-length bin. Mirrors the configuration controls of the per-antenna notebook but emphasises exploring different redundant groups. |
+| Notebook | Purpose | Description |
+|----------|---------|-------------|
+| `plot-vis.ipynb` | step 3 of the WT: visibility inspection | Loads visibilities from LOFAR Measurement Sets (via `casacore`) or UVFITS/pyuvdata-compatible files and plots amplitude and phase versus time and frequency for individual baselines. Interactive controls let you choose polarisations, antennas, and plotting axes to verify temporal and spectral smoothness. |
+| `plot-calibration-solutions.ipynb` | step 3  of the WT: calibration-solution QA | Opens complex gain solutions saved as FITS tables and plots the per-antenna, per-polarisation amplitude and phase versus frequency. Provides optional phase unwrapping and smoothness metrics to highlight jumps that may indicate cable reflections or calibration pathologies. |
+| `plot-rudimentary.ipynb` | step 3  of the WT: quick delay-spevctra inspection | Computes and plots rudimentary delay power spectra (FFT → absolute value → square). |
 
-Each notebook begins with dataset metadata inspection, followed by configuration
-cells that let you select time/frequency windows, polarisation products, target
-antennas or baseline-length limits, and plotting preferences.  Subsequent sections
-load the visibilities, prepare them for analysis, and render the diagnostic plots
-inline.
+---
+
+## Visibility-Based Delay Power Spectra
+
+A script uses **hera_pspec** (the HERA power-spectra pipeline) to compute visibility-based delay power spectra (step 4 of the WT).  
+It creates:
+
+- a time-averaged delay PS per antenna (averaging all baselines including a specific antenna), and  
+- a time-averaged delay power spectrum across all baselines.  
+
+## Image-Based Power Spectra
+
+A second script uses **pspipe** (the LOFAR power-spectra pipeline) to compute image-based cylindrically averaged power spectra  (step 4 of the WT).  
+
+It creates:
+- a Cylndrically averaged power-spectra  figure.
+- a Angular power-spectra figure.
+
+## Configuration
+
+Both scripts take a YAML file as input (with the same format).  
+The file specifies dataset location and input parameters such as instrument, data column, polarisation, and frequency/time ranges.  
+
+### Example YAML
+```yaml
+datafolder : '../data/'
+datafile   : 'hyp_1184702048_ionosub_ssins_30l_src8k_300it_8s_80kHz_i1000.uvfits'
+instrument : 'MWA'
+beamfile   : None
+data_col   : None
+
+# The polarisations to include when reading data into the object
+pol : 'XX'
+
+# The time range in Julian Date to include when reading data into the object, must be length 2. 
+# If None, all times in datafile are used.
+time_range : None
+
+# The range of frequencies to include when reading data into the object (min and max only), in MHz.
+freq_range : [100, 200]
+
+# The antenna numbers to include when reading data into the object. 
+# If None, all antennas are considered.
+antenna_nums : None
+```
 
 ## Dataset prerequisites
 Each notebook assumes access to calibrated visibility data from either an MWA or
@@ -51,6 +85,8 @@ for radio-interferometric data analysis:
 - `pyuvdata`
 - `hera_pspec`
 - `python-casacore` (required only when reading Measurement Sets)
+
+For the image-based power-spectra, a container is available at https://share.obspm.fr/s/nj3eB2bA9z9oBLd
 
 
 ## Additional resources
