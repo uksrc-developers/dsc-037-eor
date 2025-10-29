@@ -63,16 +63,16 @@ def load_config(config_file, verbose=False):
     if isinstance(cfg['pol'], str):
         cfg['pol'] = pyuvdata.utils.polstr2num(cfg['pol'])
     # for measurement set, specify data column
+    cfg['data_format'] = os.path.splitext(cfg['datafile'])[-1][1:]
     if cfg['data_col'] is None:
-        if os.path.splitext(cfg['datafile']) in ['.ms', '.MS']:
+        if os.path.splitext(cfg['datafile'])[-1] in ['.ms', '.MS']:
             cfg['data_col'] = 'DATA'
             if verbose:
                 print(f'No data column specified; using default column: {cfg["data_col"]}.')
         else:
             cfg['data_col'] = None
     # check data file
-    uvd_meta = pyuvdata.UVData()
-    uvd_meta.read(os.path.join(cfg['datafolder'], cfg['datafile']), read_data=False, data_column=cfg['data_col'])
+    uvd_meta = load_data(cfg, read_data=False)
     # TODO: read_data=False does not work with measurement sets
     # format antenna list
     if cfg['antenna_nums'] is None:
@@ -95,13 +95,14 @@ def load_config(config_file, verbose=False):
 
     # Print out loaded configuration
     if verbose:
-        print(f'Loaded {cfg["instrument"]} dataset with required configuration.')
+        print(f'\nLoaded {cfg["instrument"]} dataset with required configuration.')
         print('Data description:')
         print(f' Number of baselines: {uvd_meta.Nbls}')
         print(f' Number of times: {uvd_meta.Ntimes}')
         print(f' Number of frequencies: {uvd_meta.Nfreqs}')
         print(f' Number of polarizations: {uvd_meta.Npols} ({uvd_meta.polarization_array})')
-        print('Analysis choices:')
+        print(f' Number of antennas: {cfg["antenna_nums"].size}')
+        print('Required configuration:')
         print(f' Selected frequency range: {frequencies} MHz,'
               f' corresponding to average redshift of {cfg["avg_z"]:.1f}.')
         print(f' Selected polarization: {cfg["pol"]} ({pyuvdata.utils.polnum2str(cfg["pol"])})') 
@@ -122,6 +123,58 @@ def replace(d):
                 replace(d[k])
 
 
+def load_data(dic, read_data=True):
+    """
+    Load UVData object from file.
+
+    Parameters
+    ----------
+        dic: dict
+            Dictionary containing relevant information about data and analysis choices.
+    Returns
+    ----------
+        uvd: UVData object
+            UVData object containing (meta)data.
+
+    """
+    uvd = pyuvdata.UVData()
+    if dic['data_format'] in ['ms', 'MS']:
+        if read_data:
+            uvd.read_ms(
+                os.path.join(dic['datafolder'], dic['datafile']),
+                data_column=dic['data_col'],
+                run_check=False,
+            )
+            # check UVW convention
+            temp_obj = uvd.copy(metadata_only=True)
+            temp_obj.set_uvws_from_antenna_positions()
+            if np.allclose(uvd.uvw_array, -temp_obj.uvw_array, atol=5.):
+                print(
+                    "UVW orientation appears to be flipped, attempting to "
+                    "fix by changing conjugation of baselines."
+                )
+                uvd.uvw_array *= -1
+                uvd.data_array = np.conj(uvd.data_array)
+        else:
+            uvd.read(
+                os.path.join(dic['datafolder'], os.path.splitext(dic['datafile'])[0]+'.uvh5'),
+                read_data=False,
+            )
+    else:
+        uvd.read(
+            os.path.join(dic['datafolder'], dic['datafile']),
+            keep_all_metadata=False,
+            read_data=read_data,
+        )
+    uvd.check()
+    uvd.select(
+        polarizations=[dic['pol']],
+        time_range=dic['time_range'],
+        inplace=True
+    )
+    return uvd
+
+
 def bl_avg_delayps_per_antenna(dic, fig_folder):
     """
     Compute a delay power spectrum for a single antenna (and all associated baselines) using the `pyuvdata` and `hera_pspec` packages
@@ -137,30 +190,28 @@ def bl_avg_delayps_per_antenna(dic, fig_folder):
     if dic['beamfile'] is None:
         uvb = None
 
+    # load whole dataset
+    # create UVData object and read in data
+    uvd = load_data(dic, read_data=True)
+
     # Build delay power spectra, but only for baselines including a specific antenna.
     # loop over antennas to build delay power spectra
     data_time_avg = np.zeros((len(dic['antenna_nums']), np.diff(dic['freq_range'])[0]//2-1))
     data_per_antenna = np.zeros((len(dic['antenna_nums']), dic['Ntimes'], np.diff(dic['freq_range'])[0]//2-1))
     for u, antenna_num in enumerate(tqdm(dic['antenna_nums'])):
-        # create UVData object and read in data
-        uvd = pyuvdata.UVData()
+
         # selection when reading data not available for MS
-        # TODO: optimise to avoid re-loading full data each time
-        uvd.read(
-            os.path.join(dic['datafolder'], dic['datafile']),
-            keep_all_metadata=False,
-            read_data=True,
-            data_column=dic['data_col'],
-        )
         # select data for a single antenna
-        uvd.select(ant_str=f'{antenna_num}')
-        uvd.select(polarizations=[dic['pol']], time_range=dic['time_range'],)
+        uvd_loc = uvd.select(
+            ant_str=f'{antenna_num}',
+            inplace=False
+        )
         # average over all the baselines including said antenna
-        uvd.compress_by_redundancy(tol=100000., use_grid_alg=True)
+        uvd_loc.compress_by_redundancy(tol=100000., use_grid_alg=True)
         # Create a new PSpecData object which will be used to compute the delay PS
-        ds = hp.PSpecData(dsets=[uvd, uvd], wgts=[None, None], beam=uvb)
+        ds = hp.PSpecData(dsets=[uvd_loc, uvd_loc], wgts=[None, None], beam=uvb)
         # in the baseline-averaged dataset, there is only one baseline left (the first one)
-        bl = uvd.baseline_to_antnums(uvd.baseline_array[0])
+        bl = uvd_loc.baseline_to_antnums(uvd_loc.baseline_array[0])
         # build time-averaged delay ps from pairing the baseline with itself
         uvp = ds.pspec(
             [bl], [bl],  # select the baselines to cross (here, with itself)
@@ -231,7 +282,7 @@ def bl_avg_delayps_per_antenna(dic, fig_folder):
     fig.savefig(fig_folder / f'delay_ps_per_antenna_vs_time_{dic["instrument"]}.png', dpi=300)
 
 
-def time_average_delayps_across_blens(dic, fig_folder, max_bl_len=30., bl_tol=1., verbose=False):
+def time_average_delayps_across_blens(dic, fig_folder, bl_tol=1., verbose=False):
     """
     Compute a time-averaged delay power spectrum across all baselines using the `pyuvdata` and `hera_pspec` packages
 
@@ -241,8 +292,6 @@ def time_average_delayps_across_blens(dic, fig_folder, max_bl_len=30., bl_tol=1.
             Dictionary containing relevant information about data and analysis choices.
         fig_folder: Path
             Path to folder where to save figures.
-        max_bl_len: float
-            Maximum baseline length to consider [m].
         bl_tol: float
             Baseline tolerance to use when grouping redundant baselines [m].
 
@@ -250,18 +299,15 @@ def time_average_delayps_across_blens(dic, fig_folder, max_bl_len=30., bl_tol=1.
     if dic['beamfile'] is None:
         uvb = None
 
-    uvd = pyuvdata.UVData()
-    uvd.read(
-        os.path.join(dic['datafolder'], dic['datafile']),
-        polarizations=[dic['pol']],
-        time_range=dic['time_range'],
-        keep_all_metadata=False,
-        read_data=True,
-        data_column=dic['data_col'],
-    )
+    # load whole dataset
+    # create UVData object and read in data
+    uvd = load_data(dic, read_data=True)
 
     # Coherent time average of visibilities
-    uvd.downsample_in_time(n_times_to_avg=dic['Ntimes'])
+    # TODO: temporary fix whilst waiting for pyuvdata issue to be resolved
+    # will perform incoherent time averaging instead for MS
+    if dic['data_format'] not in ['ms', 'MS']:
+        uvd.downsample_in_time(n_times_to_avg=dic['Ntimes'])
 
     # Use hera_cal.redcal to get matching, redundant baseline-pair groups within the specified baseline tolerance, not including flagged ants.
     bls1, bls2, _, _, _, red_groups, red_lens, _ = hp.utils.calc_blpair_reds(
@@ -270,11 +316,11 @@ def time_average_delayps_across_blens(dic, fig_folder, max_bl_len=30., bl_tol=1.
         exclude_permutations=True,
         include_autocorrs=False, include_crosscorrs=True,
         bl_tol=bl_tol,
-        bl_len_range=(0, max_bl_len),
+        bl_len_range=(0, dic['max_bl_len']),
         extra_info=True
     )
     if verbose:
-        print(f'There are {len(bls1)} redundant groups of auto-baselines with length < {max_bl_len} m.')
+        print(f'There are {len(bls1)} redundant groups of auto-baselines with length < {dic['max_bl_len']} m.')
 
     # Create a new PSpecData object which will be used to compute the delay PS
     ds = hp.PSpecData(dsets=[uvd, uvd], wgts=[None, None], beam=uvb)
@@ -286,6 +332,8 @@ def time_average_delayps_across_blens(dic, fig_folder, max_bl_len=30., bl_tol=1.
         spw_ranges=[tuple(dic['freq_range'])],  # select a smaller bandwidth
         verbose=False
     )
+    if dic['data_format'] in ['ms', 'MS']:
+        uvp.average_spectra(time_avg=True, inplace=True)
 
     # plot
     dat = np.copy(uvp.data_array[0][:, :, 0])
@@ -323,10 +371,10 @@ def main(config_file):
 
     # Compute a delay power spectrum for a single antenna (and all associated baselines) 
     # Produce corresponding figures
-    # bl_avg_delayps_per_antenna(dic, root)
+    bl_avg_delayps_per_antenna(dic, root)
 
     # Compute a time-averaged delay power spectrum across redundant baselines
-    time_average_delayps_across_blens(dic, root, max_bl_len=30., bl_tol=1., verbose=True)
+    time_average_delayps_across_blens(dic, root, bl_tol=1., verbose=True)
 
 
 if __name__ == "__main__":
