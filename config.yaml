@@ -1,0 +1,23 @@
+# Configuration file for DSC-037 plotting notebooks
+# This file contains COMMON parameters shared across:
+# - plot-calibration-solutions.ipynb
+# - plot-rudimentary.ipynb
+# - plot-vis.ipynb
+#
+# Notebook-specific parameters remain in their respective notebooks
+
+# Required parameters
+ant1: "2"  # Antenna 1 (name or index)
+ant2: "6"  # Antenna 2 (name or index)
+
+# Optional common parameters
+#input_file: "L253456_SAP000_002_time1.flagged.5ch8s.dical.MS"  # Input file path (MS, UVFITS, or FITS format) (optional, can be overridden in notebooks)
+input_file: "hyp_1184702048_ionosub_ssins_30l_src8k_300it_8s_80kHz_i1000.uvfits"  # Input file path (MS, UVFITS, or FITS format) (optional, can be overridden in notebooks)
+corr: "XX"  # Polarization: XX, YY, XY, YX, nn, ee, etc. (optional)
+col: "DATA"  # Column: DATA, CORRECTED_DATA, MODEL_DATA (optional)
+outdir: "./"  # Output directory for plots (optional)
+timebin: 1  # Time binning factor (optional)
+chanbin: 1  # Channel binning factor (optional)
+use_weights: false  # Use weights for averaging (optional)
+chunksize: 100000  # Chunk size for MS processing (optional)
+format: "auto"  # Input format: auto, ms, or uvfits (optional)
