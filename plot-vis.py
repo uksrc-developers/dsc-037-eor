@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 from casacore.tables import table
 from astropy.io import fits
 from astropy.time import Time
+import yaml
 
 try:
     from pyuvdata import UVData
@@ -551,35 +552,100 @@ def save_plots(results, outdir):
     return f1, f2, f3, f4
 
 # ----------------------
-# Main function
+# Main processing function (from notebook)
 # ----------------------
-def main():
-    parser = argparse.ArgumentParser(description="Plot visibility amplitude/phase vs time/frequency.")
-    parser.add_argument("input_file", help="Input file (MS or UVFITS format)")
-    parser.add_argument("--ant1", required=True, help="Antenna 1 (name or index)")
-    parser.add_argument("--ant2", required=True, help="Antenna 2 (name or index)")
-    parser.add_argument("--corr", default='XX', help="Correlation to plot (e.g. XX, XY, YY, RR, RL, LL)")
-    parser.add_argument("--col", default='DATA', help="Column to plot (DATA, MODEL_DATA, CORRECTED_DATA)")
-    parser.add_argument("--outdir", default='.', help="Output directory for plots")
-    parser.add_argument("--timebin", type=int, default=1, help="Time binning factor")
-    parser.add_argument("--chanbin", type=int, default=1, help="Channel binning factor")
-    parser.add_argument("--use_weights", action='store_true', help="Use weights for averaging")
-    parser.add_argument("--chunksize", type=int, default=100000, help="Chunk size for MS processing")
-    parser.add_argument("--format", choices=['auto', 'ms', 'uvfits'], default='auto', 
-                        help="Force input format (auto detect by default)")
-    args = parser.parse_args()
+def run_processing_and_plotting(config_file='config.yaml', input_file=None, ant1=None, ant2=None, 
+                                  corr=None, col=None, timebin=None, chanbin=None, 
+                                  use_weights=None, chunksize=None, format_type=None, outdir=None):
+    """
+    Process visibility data and generate plots based on configuration parameters.
+    
+    Common parameters are read from config.yaml by default. All parameters can be overridden 
+    by passing them as function arguments.
+    
+    Parameters:
+    -----------
+    config_file : str, optional
+        Path to configuration YAML file (default: 'config.yaml')
+    input_file : str, optional
+        Path to input data file (MS or UVFITS format). If None, read from config_file.
+    ant1 : str or int, optional
+        Antenna 1 name or index. If None, read from config_file.
+    ant2 : str or int, optional
+        Antenna 2 name or index. If None, read from config_file.
+    corr : str, optional
+        Correlation to plot (e.g. XX, XY, YY, NN, EE, NE). If None, read from config_file.
+    col : str, optional
+        Column to plot (DATA, MODEL_DATA, CORRECTED_DATA). If None, read from config_file.
+    timebin : int, optional
+        Time binning factor. If None, read from config_file.
+    chanbin : int, optional
+        Channel binning factor. If None, read from config_file.
+    use_weights : bool, optional
+        Use weights for averaging. If None, read from config_file.
+    chunksize : int, optional
+        Chunk size for MS processing. If None, read from config_file.
+    format_type : str, optional
+        Force input format ('auto', 'ms', 'uvfits'). If None, read from config_file.
+    outdir : str, optional
+        Output directory for plots. If None, read from config_file or default to '.'.
+    
+    Returns:
+    --------
+    dict
+        Results dictionary containing processed data and statistics
+    """
+    
+    # Load configuration from config.yaml
+    try:
+        with open(config_file, 'r') as f:
+            config = yaml.safe_load(f)
+    except FileNotFoundError:
+        print(f"[WARNING] Config file '{config_file}' not found. Using defaults.")
+        config = {}
+    except Exception as e:
+        print(f"[WARNING] Error reading config file '{config_file}': {e}. Using defaults.")
+        config = {}
+    
+    # Use config defaults if parameters not provided
+    if input_file is None:
+        input_file = config.get('input_file', '')
+        # Fallback to default if config doesn't have input_file or it's empty
+        if not input_file:
+            input_file = "hyp_1184702048_ionosub_ssins_30l_src8k_300it_8s_80kHz_i1000.uvfits"
+    
+    if ant1 is None:
+        ant1 = config.get('ant1', 2)
+    if ant2 is None:
+        ant2 = config.get('ant2', 6)
+    if corr is None:
+        corr = config.get('corr', 'xx')
+    if col is None:
+        col = config.get('col', 'DATA')
+    if timebin is None:
+        timebin = config.get('timebin', 1)
+    if chanbin is None:
+        chanbin = config.get('chanbin', 1)
+    if use_weights is None:
+        use_weights = config.get('use_weights', False)
+    if chunksize is None:
+        chunksize = config.get('chunksize', 100000)
+    if format_type is None:
+        format_type = config.get('format', 'auto')
+    if outdir is None:
+        outdir = config.get('outdir', '.')
     
     # Determine file format
-    if args.format == 'auto':
-        if args.input_file.endswith('.ms') or os.path.isdir(args.input_file):
+    if format_type == 'auto':
+        if input_file.endswith('.ms') or os.path.isdir(input_file):
             # Check if it's an MS directory (has POLARIZATION subtable)
             try:
-                with table(f"{args.input_file}/POLARIZATION", readonly=True, ack=False):
+                with table(f"{input_file}/POLARIZATION", readonly=True, ack=False):
                     file_format = 'ms'
             except (RuntimeError, OSError):
                 # Not an MS, try UVFITS
                 try:
-                    with fits.open(args.input_file) as hdul:
+                    with fits.open(input_file) as hdul:
                         if 'PRIMARY' in hdul and 'GROUPING' in [h.name for h in hdul]:
                             file_format = 'uvfits'
                         else:
@@ -593,45 +659,45 @@ def main():
                     if PYUVDATA_AVAILABLE:
                         try:
                             uv = UVData()
-                            uv.read(args.input_file, read_data=False)
+                            uv.read(input_file, read_data=False)
                             file_format = 'uvfits'
                         except Exception:
                             raise ValueError("Cannot determine file format")
                     else:
                         raise ValueError("Cannot determine file format and pyuvdata not available")
-        elif args.input_file.endswith(('.fits', '.uvfits', '.FITS', '.UVFITS')):
+        elif input_file.endswith(('.fits', '.uvfits', '.FITS', '.UVFITS')):
             file_format = 'uvfits'
         else:
-            raise ValueError("Cannot determine file format. Use --format to specify.")
+            raise ValueError("Cannot determine file format. Use format_type to specify.")
     else:
-        file_format = args.format
-    
+        file_format = format_type
+
     # Process file
     try:
         if file_format == 'ms':
             print("[INFO] Processing as Measurement Set (MS) format")
             results = process_ms(
-                ms_path=args.input_file,
-                ant1=args.ant1,
-                ant2=args.ant2,
-                corr=args.corr,
-                col=args.col,
-                timebin=args.timebin,
-                chanbin=args.chanbin,
-                use_weights=args.use_weights,
-                chunksize=args.chunksize
+                ms_path=input_file,
+                ant1=ant1,
+                ant2=ant2,
+                corr=corr,
+                col=col,
+                timebin=timebin,
+                chanbin=chanbin,
+                use_weights=use_weights,
+                chunksize=chunksize
             )
         elif file_format == 'uvfits':
             print("[INFO] Processing as UVFITS format (using pyuvdata)")
             results = process_uvfits(
-                uvfits_path=args.input_file,
-                ant1=args.ant1,
-                ant2=args.ant2,
-                pol=args.corr,
-                col=args.col,
-                timebin=args.timebin,
-                chanbin=args.chanbin,
-                use_weights=args.use_weights
+                uvfits_path=input_file,
+                ant1=ant1,
+                ant2=ant2,
+                pol=corr,
+                col=col,
+                timebin=timebin,
+                chanbin=chanbin,
+                use_weights=use_weights
             )
         else:
             raise ValueError(f"Unsupported format: {file_format}")
@@ -647,14 +713,88 @@ def main():
         print("===================\n")
         
         # Save plots
-        f1, f2, f3, f4 = save_plots(results, args.outdir)
+        f1, f2, f3, f4 = save_plots(results, outdir)
         print("Saved plots:")
         for f in (f1, f2, f3, f4):
             print(" ", f)
+        
+        return results
             
     except Exception as e:
         print(f"[ERROR] Processing failed: {str(e)}")
         raise
+
+# ----------------------
+# Main function
+# ----------------------
+def main():
+    parser = argparse.ArgumentParser(
+        description="Plot visibility amplitude/phase vs time/frequency.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Use config.yaml (all parameters from config file)
+  python plot_vis.py --config config.yaml
+  
+  # Override specific parameters from config.yaml
+  python plot_vis.py --config config.yaml --ant1 3 --ant2 7
+  
+  # Use command line arguments only (no config file)
+  python plot_vis.py input_file.ms --ant1 2 --ant2 6 --corr XX --outdir ./plots
+        """
+    )
+    parser.add_argument("input_file", nargs='?', default=None,
+                        help="Input file (MS or UVFITS format). Optional if using --config")
+    parser.add_argument("--config", default='config.yaml',
+                        help="Path to configuration YAML file (default: 'config.yaml')")
+    parser.add_argument("--ant1", help="Antenna 1 (name or index). Overrides config.yaml")
+    parser.add_argument("--ant2", help="Antenna 2 (name or index). Overrides config.yaml")
+    parser.add_argument("--corr", help="Correlation to plot (e.g. XX, XY, YY, RR, RL, LL). Overrides config.yaml")
+    parser.add_argument("--col", help="Column to plot (DATA, MODEL_DATA, CORRECTED_DATA). Overrides config.yaml")
+    parser.add_argument("--outdir", help="Output directory for plots. Overrides config.yaml")
+    parser.add_argument("--timebin", type=int, help="Time binning factor. Overrides config.yaml")
+    parser.add_argument("--chanbin", type=int, help="Channel binning factor. Overrides config.yaml")
+    parser.add_argument("--use_weights", action='store_true', help="Use weights for averaging. Overrides config.yaml")
+    parser.add_argument("--chunksize", type=int, help="Chunk size for MS processing. Overrides config.yaml")
+    parser.add_argument("--format", choices=['auto', 'ms', 'uvfits'], 
+                        help="Force input format. Overrides config.yaml")
+    args = parser.parse_args()
+    
+    # Convert command line arguments to function parameters (None means use config)
+    # Handle ant1 and ant2 - convert string to int if possible, otherwise keep as string
+    ant1_arg = None
+    ant2_arg = None
+    if args.ant1 is not None:
+        try:
+            ant1_arg = int(args.ant1)
+        except ValueError:
+            ant1_arg = args.ant1
+    if args.ant2 is not None:
+        try:
+            ant2_arg = int(args.ant2)
+        except ValueError:
+            ant2_arg = args.ant2
+    
+    # Handle use_weights - if not specified, pass None to let config decide
+    use_weights_arg = None
+    if args.use_weights:
+        use_weights_arg = True
+    
+    # Call the main processing function
+    run_processing_and_plotting(
+        config_file=args.config,
+        input_file=args.input_file,
+        ant1=ant1_arg,
+        ant2=ant2_arg,
+        corr=args.corr,
+        col=args.col,
+        timebin=args.timebin,
+        chanbin=args.chanbin,
+        use_weights=use_weights_arg,
+        chunksize=args.chunksize,
+        format_type=args.format,
+        outdir=args.outdir
+    )
 
 if __name__ == "__main__":
     main()
