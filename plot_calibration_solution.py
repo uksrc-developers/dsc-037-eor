@@ -43,21 +43,10 @@ def unwrap_phase_per_tile_pol(phases):
 # =============================
 # Parameter Settings
 # =============================
-if len(sys.argv) == 1:
-    print(f"Usage: {sys.argv[0]} [filename.fits]")
-    print("If no filename is given, the default FITS file will be used:")
-    print("    hyp_soln_1184702048_ssins_30l_src8k_300it.fits")
-    sys.exit(0)
-elif len(sys.argv) == 2:
-    if sys.argv[1] in ["-h", "--help"]:
-        print(f"Usage: {sys.argv[0]} [filename.fits]")
-        print("If no filename is given, the default FITS file will be used:")
-        print("    hyp_soln_1184702048_ssins_30l_src8k_300it.fits")
-        sys.exit(0)
-    filename = sys.argv[1]
-else:
+if len(sys.argv) != 2 or sys.argv[1] in ["-h", "--help"]:
     print(f"Usage: {sys.argv[0]} [filename.fits]")
     sys.exit(1)
+filename = sys.argv[1]
 # =============================
 # Open FITS file
 # =============================
