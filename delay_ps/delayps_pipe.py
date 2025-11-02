@@ -73,10 +73,11 @@ def load_config(config_file, verbose=False):
             cfg['data_col'] = None
     # check data file
     uvd_meta = load_data(cfg, read_data=False)
+    cfg.update({"instrument": uvd_meta.telescope.name})
     # TODO: read_data=False does not work with measurement sets
     # format antenna list
     if cfg['antenna_nums'] is None:
-        cfg['antenna_nums'] = np.unique(uvd_meta.ant_1_array)
+        cfg['antenna_nums'] = uvd_meta.get_ants()
         if verbose:
             print(f'No antennas specified; using all antennas in data ({cfg["antenna_nums"].size}).')
     cfg['antenna_nums'] = np.atleast_1d(cfg['antenna_nums'])
@@ -90,7 +91,7 @@ def load_config(config_file, verbose=False):
             print(f'No times specified; using all timestamps in data ({cfg["Ntimes"]}).')
     # format frequency range
     cosmo = hp.conversions.Cosmo_Conversions()
-    frequencies = np.array([uvd_meta.freq_array[cfg['freq_range'][i]] for i in [0,1]])/1e6  # MHz
+    frequencies = np.array([uvd_meta.freq_array[cfg['freq_range'][i]] for i in [0, 1]])/1e6  # MHz
     cfg['avg_z'] = cosmo.f2z(np.mean(frequencies)*1e6)
 
     # Print out loaded configuration
@@ -105,7 +106,8 @@ def load_config(config_file, verbose=False):
         print('Required configuration:')
         print(f' Selected frequency range: {frequencies} MHz,'
               f' corresponding to average redshift of {cfg["avg_z"]:.1f}.')
-        print(f' Selected polarization: {cfg["pol"]} ({pyuvdata.utils.polnum2str(cfg["pol"])})') 
+        print(f' Selected polarization: {cfg["pol"]} ({pyuvdata.utils.polnum2str(cfg["pol"])})')
+        print(f' Selected antennas: {cfg["antenna_nums"]}')
 
     return cfg
 
@@ -135,6 +137,9 @@ def load_data(dic, read_data=True):
     ----------
         uvd: UVData object
             UVData object containing (meta)data.
+        read_data: boolean
+            Whether to read data (True) or only metadata (False).
+            Default is True.
 
     """
     uvd = pyuvdata.UVData()
@@ -279,7 +284,8 @@ def bl_avg_delayps_per_antenna(dic, fig_folder):
     for i in np.arange(ncol * nrow % len(dic['antenna_nums'])):
         axes.flatten()[-i-1].set_visible(False)
     fig.tight_layout()
-    fig.savefig(fig_folder / f'delay_ps_per_antenna_vs_time_{dic["instrument"]}.png', dpi=300)
+    fig_name = f'delay_ps_per_antenna_vs_time_{dic["instrument"]}_{pyuvdata.utils.polnum2str(dic["pol"])}.png'
+    fig.savefig(fig_folder / fig_name, dpi=300)
 
 
 def time_average_delayps_across_blens(dic, fig_folder, bl_tol=1., verbose=False):
@@ -320,7 +326,7 @@ def time_average_delayps_across_blens(dic, fig_folder, bl_tol=1., verbose=False)
         extra_info=True
     )
     if verbose:
-        print(f'There are {len(bls1)} redundant groups of auto-baselines with length < {dic['max_bl_len']} m.')
+        print(f'There are {len(bls1)} redundant groups of auto-baselines with length < {dic["max_bl_len"]} m.')
 
     # Create a new PSpecData object which will be used to compute the delay PS
     ds = hp.PSpecData(dsets=[uvd, uvd], wgts=[None, None], beam=uvb)
@@ -352,7 +358,8 @@ def time_average_delayps_across_blens(dic, fig_folder, bl_tol=1., verbose=False)
     ax.set_xlabel(r'Delay [$\mu$s]')
     ax.set_ylabel('Baseline length [m]')
     fig.tight_layout()
-    fig.savefig(fig_folder / f'bl-avg_delay_ps_across_blens_{dic["instrument"]}.png', dpi=300)
+    fig_name = f'bl-avg_delay_ps_across_blens_{dic["instrument"]}_{pyuvdata.utils.polnum2str(dic["pol"])}.png'
+    fig.savefig(fig_folder / fig_name, dpi=300)
 
 
 @click.command()
