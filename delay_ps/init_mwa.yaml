@@ -1,6 +1,5 @@
 datafolder : '../data/'
 datafile : 'hyp_1184702048_ionosub_ssins_30l_src8k_300it_8s_80kHz_i1000.uvfits'
-beamfile : None
 data_col : None
 
 # The polarizations numbers to include when reading data into the object

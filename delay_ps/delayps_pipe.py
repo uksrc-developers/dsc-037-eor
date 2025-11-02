@@ -67,9 +67,6 @@ def load_config(config_file, verbose=False):
 
     # Replace entries
     replace(cfg)
-    # beam
-    if cfg['beamfile'] is not None:
-        raise NotImplementedError("Custom beamfile reading not implemented yet.")
     # turn string pol to int
     if isinstance(cfg['pol'], str):
         cfg['pol'] = pyuvdata.utils.polstr2num(cfg['pol'])
@@ -290,8 +287,6 @@ def bl_avg_delayps_per_antenna(dic, fig_folder):
             Path to folder where to save figures.
 
     """
-    if dic['beamfile'] is None:
-        uvb = None
 
     # load whole dataset
     # create UVData object and read in data
@@ -312,7 +307,7 @@ def bl_avg_delayps_per_antenna(dic, fig_folder):
         # average over all the baselines including said antenna
         uvd_loc.compress_by_redundancy(tol=100000., use_grid_alg=True)
         # Create a new PSpecData object which will be used to compute the delay PS
-        ds = hp.PSpecData(dsets=[uvd_loc, uvd_loc], wgts=[None, None], beam=uvb)
+        ds = hp.PSpecData(dsets=[uvd_loc, uvd_loc], wgts=[None, None], beam=None)
         # in the baseline-averaged dataset, there is only one baseline left (the first one)
         bl = uvd_loc.baseline_to_antnums(uvd_loc.baseline_array[0])
         # build time-averaged delay ps from pairing the baseline with itself
@@ -400,8 +395,6 @@ def time_average_delayps_across_blens(dic, fig_folder, bl_tol=1., verbose=False)
             Baseline tolerance to use when grouping redundant baselines [m].
 
     """
-    if dic['beamfile'] is None:
-        uvb = None
 
     # load whole dataset
     # create UVData object and read in data
@@ -427,7 +420,7 @@ def time_average_delayps_across_blens(dic, fig_folder, bl_tol=1., verbose=False)
         print(f'There are {len(bls1)} redundant groups of auto-baselines with length < {dic["max_bl_len"]} m.')
 
     # Create a new PSpecData object which will be used to compute the delay PS
-    ds = hp.PSpecData(dsets=[uvd, uvd], wgts=[None, None], beam=uvb)
+    ds = hp.PSpecData(dsets=[uvd, uvd], wgts=[None, None], beam=None)
     # build delay ps from baseline pairs constructed above
     uvp = ds.pspec(
         bls1, bls2,
