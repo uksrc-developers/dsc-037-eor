@@ -1,19 +1,21 @@
 # **DSC-037**: Cable reflection systematics for EoR science
-# 
-# **Author:** Adélie Gorce and Teal team 
-# 
+#
+# **Author:** Adélie Gorce, Florent Mertens, and the Teal team
+#
 # **Documentation on confluence:** 
 # - DSC description page: https://confluence.skatelescope.org/x/0rs6F
 # - Chronological walkthrough: https://confluence.skatelescope.org/x/osw6F
 # - Implementation: https://confluence.skatelescope.org/x/n8LMF
 # - GitHub repo: https://github.com/uksrc-developers/dsc-037-eor
-# 
+#
 # **Summary:**  This notebook is a first implementation of the step 4 of DSC-037 (see chronological walkthrough above) to calculate delay power spectra for individual baselines and then cylindrically averaged power spectra for a user-specified set of frequencies, times, and polarisations.
 # In this notebook, we
 # - Load the visibilities of a given dataset
 # - Compute a delay power spectra for checking cable reflections in EoR data, using the `pyuvdata` and `hera_pspec` packages
 #
-# **Ticket:** TEAL-1129 https://jira.skatelescope.org/browse/TEAL-1129
+# **Tickets:** 
+# - TEAL-1129 https://jira.skatelescope.org/browse/TEAL-1129
+# - TEAL-1158 https://jira.skatelescope.org/browse/TEAL-1158
 
 # import required packages
 import numpy as np
@@ -28,6 +30,15 @@ import yaml
 
 import hera_pspec as hp
 import pyuvdata
+from casacore.tables import table
+from astropy.coordinates import EarthLocation
+
+# CASA Stokes enum mapping
+STOKES_MAP = {
+    1: "I", 2: "Q", 3: "U", 4: "V",
+    5: "RR", 6: "RL", 7: "LR", 8: "LL",
+    9: "XX", 10: "XY", 11: "YX", 12: "YY",
+}
 
 
 def load_config(config_file, verbose=False):
@@ -74,7 +85,6 @@ def load_config(config_file, verbose=False):
     # check data file
     uvd_meta = load_data(cfg, read_data=False)
     cfg.update({"instrument": uvd_meta.telescope.name})
-    # TODO: read_data=False does not work with measurement sets
     # format antenna list
     if cfg['antenna_nums'] is None:
         cfg['antenna_nums'] = uvd_meta.get_ants()
@@ -125,6 +135,97 @@ def replace(d):
                 replace(d[k])
 
 
+def telescope_from_ms(ms_path):
+    """
+    Extract telescope metadata from MS and return a pyuvdata.Telescope.
+    
+    Parameters
+    ----------
+        ms_path: str or Path
+            Path to measurement set folder.
+
+    Returns
+    -------
+        tel: pyuvdata.Telescope
+            pyuvdata.Telescope object containing the information
+            extracted from the MS.
+
+    """
+    # ANTENNA subtable
+    ant_tab = table(ms_path + "/ANTENNA", readonly=True)
+    ant_names = ant_tab.getcol("NAME")
+    ant_positions = ant_tab.getcol("POSITION")  # ECEF meters
+    ant_tab.close()
+
+    # OBSERVATION subtable
+    obs_tab = table(ms_path + "/OBSERVATION", readonly=True)
+    telescope_name = obs_tab.getcol("TELESCOPE_NAME")[0]
+    obs_tab.close()
+
+    # Use first antenna as reference
+    loc_array = ant_positions[0]
+    telescope_location = EarthLocation.from_geocentric(*loc_array, unit="m")
+
+    ant_numbers = np.arange(len(ant_names))
+
+    tel = pyuvdata.Telescope.new(
+        name=telescope_name,
+        location=telescope_location,
+        antenna_positions=ant_positions,
+        antenna_names=ant_names,
+        antenna_numbers=ant_numbers.tolist(),
+        instrument=telescope_name,
+    )
+    return tel
+
+
+def uvd_meta_from_ms(ms_path):
+    """
+    Build a UVData metadata-only object from MS metadata.
+    
+    Parameters
+    ----------
+        ms_path: str or Path
+            Path to measurement set folder.
+
+    Returns
+    -------
+        uvd: pyuvdata.UVData object
+            pyuvdata.UVData object containing the information
+            extracted from the MS.
+    
+    """
+    # Telescope
+    tel = telescope_from_ms(ms_path)
+
+    # Frequencies (Hz)
+    spw_tab = table(ms_path + "/SPECTRAL_WINDOW", readonly=True)
+    freqs = spw_tab.getcol("CHAN_FREQ").flatten()
+    spw_tab.close()
+    freq_array = freqs
+
+    # Polarizations
+    pol_tab = table(ms_path + "/POLARIZATION", readonly=True)
+    corr_types = pol_tab.getcol("CORR_TYPE")[0]
+    pol_tab.close()
+    polarization_array = [STOKES_MAP.get(c, f"corr{c}") for c in corr_types]
+
+    # Times (MS stores seconds from MJD=0)
+    main_tab = table(ms_path, readonly=True)
+    times_sec = main_tab.getcol("TIME")  # seconds
+    main_tab.close()
+    times_jd = np.unique(times_sec) / 86400.0 + 2400000.5
+
+    # Build UVData metadata-only object
+    uvd = pyuvdata.UVData.new(
+        freq_array=freq_array,
+        polarization_array=polarization_array,
+        times=times_jd,
+        telescope=tel,
+    )
+    return uvd
+
+
 def load_data(dic, read_data=True):
     """
     Load UVData object from file.
@@ -161,10 +262,7 @@ def load_data(dic, read_data=True):
                 uvd.uvw_array *= -1
                 uvd.data_array = np.conj(uvd.data_array)
         else:
-            uvd.read(
-                os.path.join(dic['datafolder'], os.path.splitext(dic['datafile'])[0]+'.uvh5'),
-                read_data=False,
-            )
+            uvd = uvd_meta_from_ms(os.path.join(dic['datafolder'], dic['datafile']))
     else:
         uvd.read(
             os.path.join(dic['datafolder'], dic['datafile']),

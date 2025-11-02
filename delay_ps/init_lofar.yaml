@@ -10,6 +10,6 @@ time_range : None
 # The indices describing the range of frequencies to include (min and max only).
 freq_range : [100, 200]
 # The antennas numbers to include when reading data into the object. If None, all antennas are considered.
-antenna_nums : [9, 10]
+antenna_nums : None
 # The maximum baseline length to consider (in meters)
 max_bl_len : 100.
