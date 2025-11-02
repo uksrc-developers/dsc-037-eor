@@ -350,7 +350,8 @@ def bl_avg_delayps_per_antenna(dic, fig_folder):
     ax.set_ylabel(r'Delay [$\mu$s]')
     ax.set_xlabel('Antenna number')
     fig.tight_layout()
-    fig.savefig(fig_folder / f'delay_ps_per_antenna_{dic["instrument"]}.png', dpi=300) 
+    fig_name1 = f'delay_ps_per_antenna_{dic["instrument"]}_{pyuvdata.utils.polnum2str(dic["pol"])}.png'
+    fig.savefig(fig_folder / fig_name1, dpi=300) 
 
     # Gather the results in a figure showing the delay power spectrum as a function of time for each antenna, in order to identify which antenna is most impacted by cable reflections
     ncol = 10
@@ -377,8 +378,8 @@ def bl_avg_delayps_per_antenna(dic, fig_folder):
     for i in np.arange(ncol * nrow % len(dic['antenna_nums'])):
         axes.flatten()[-i-1].set_visible(False)
     fig.tight_layout()
-    fig_name = f'delay_ps_per_antenna_vs_time_{dic["instrument"]}_{pyuvdata.utils.polnum2str(dic["pol"])}.png'
-    fig.savefig(fig_folder / fig_name, dpi=300)
+    fig_name2 = f'delay_ps_per_antenna_vs_time_{dic["instrument"]}_{pyuvdata.utils.polnum2str(dic["pol"])}.png'
+    fig.savefig(fig_folder / fig_name2, dpi=300)
 
 
 def time_average_delayps_across_blens(dic, fig_folder, bl_tol=1., verbose=False):
