@@ -119,6 +119,7 @@ def load_config(config_file, verbose=False):
               f' corresponding to average redshift of {cfg["avg_z"]:.1f}.')
         print(f' Selected polarization: {cfg["pol"]} ({[pyuvdata.utils.polnum2str(p) for p in cfg["pol"]]})')
         print(f' Selected antennas: {cfg["antenna_nums"]}')
+        print(f'Performing {cfg['analysis_type']} analysis..')
 
     return cfg
 
@@ -514,7 +515,11 @@ def autocorr_visibilities_per_antenna(dic, fig_folder):
         ax = axes.flatten()[i]
         for ip, pol in enumerate(uvd.get_pols()):
             abl = (ant, ant, pol)
-            ax.semilogy(F.delays, np.abs(np.squeeze(F.avg_fft[abl])), label=pol, color=f'C{ip}')
+            ax.semilogy(
+                F.delays, np.abs(np.squeeze(F.avg_fft[abl])),
+                label=pol, color=f'C{ip}',
+                lw=1., alpha=.6
+        )
         ax.set_title(f'({ant}, {ant})')
         ax.grid()
         if i % ncol == 0:
@@ -523,7 +528,7 @@ def autocorr_visibilities_per_antenna(dic, fig_folder):
             ax.set_ylabel(r'$\vert \widetilde{V}_{ii} \vert$  [Jy Hz]')
     for i in np.arange(ncol * nrow % len(dic['antenna_nums'])):
         axes.flatten()[-i-1].set_visible(False)
-    axes[0].legend()
+    axes.flatten()[0].legend()
     fig.tight_layout()
     fig_name = f'autocorr_visibilities_{dic["instrument"]}.png'
     fig.savefig(fig_folder / fig_name, dpi=300)
@@ -544,15 +549,20 @@ def main(config_file):
     # The information is then loaded with the `load_config` method.
     dic = load_config(config_path, verbose=True)
 
-    # Compute a delay power spectrum for a single antenna (and all associated baselines) 
-    # Produce corresponding figures
-    bl_avg_delayps_per_antenna(dic, root)
+    if dic['analysis_type'] == 'cross':
+        # Compute a delay power spectrum for a single antenna (and all associated baselines) 
+        # Produce corresponding figures
+        bl_avg_delayps_per_antenna(dic, root)
 
-    # Compute a time-averaged delay power spectrum across redundant baselines
-    time_average_delayps_across_blens(dic, root, bl_tol=1., verbose=True)
+        # Compute a time-averaged delay power spectrum across redundant baselines
+        time_average_delayps_across_blens(dic, root, bl_tol=1., verbose=True)
 
-    # Compute time-averaged delay visibilities for auto-correlations
-    autocorr_visibilities_per_antenna(dic, root)
+    elif dic['analysis_type'] in ['auto', 'autos']:
+        # Compute time-averaged delay visibilities for auto-correlations
+        autocorr_visibilities_per_antenna(dic, root)
+
+    else:
+        raise ValueError('Analysis type can only be auto or cross.')
 
 
 if __name__ == "__main__":

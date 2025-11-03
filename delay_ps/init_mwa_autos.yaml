@@ -1,5 +1,5 @@
 datafolder : '../data/'
-datafile : 'hyp_1184702048_ionosub_ssins_30l_src8k_300it_8s_80kHz_i1000.uvfits'
+datafile : 'hyp_1184702048_ssins_30l_src8k_300it_8s_80kHz.autos.uvfits'
 data_col : None
 
 # The polarizations numbers to include when reading data into the object
@@ -9,8 +9,8 @@ time_range : None
 # The indices describing the range of frequencies to include (min and max only).
 freq_range : [100, 200]
 # The antennas numbers to include when reading data into the object. If None, all antennas are considered.
-antenna_nums : [9, 10] #None
+antenna_nums : None
 # The maximum baseline length to consider (in meters)
 max_bl_len : 30.
 # Choose type of analysis between auto- and cross-correlation of visibilities
-analysis_type: 'cross'
+analysis_type: 'auto'
