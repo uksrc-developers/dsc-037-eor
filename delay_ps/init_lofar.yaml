@@ -12,3 +12,5 @@ freq_range : [100, 200]
 antenna_nums : [9, 10] # None
 # The maximum baseline length to consider (in meters)
 max_bl_len : 100.
+# Choose type of analysis between auto- and cross-correlation of visibilities
+analysis_type: 'cross'
