@@ -510,10 +510,12 @@ def autocorr_visibilities_per_antenna(dic, fig_folder):
     ncol = 10
     nrow = np.ceil(len(dic['antenna_nums'])/ncol).astype(int)
     fig, axes = plt.subplots(nrow, ncol, figsize=(20, 2*nrow), sharex=True, sharey=True)
-    for i, abl in enumerate(F.data):
+    for i, ant in enumerate(uvd.get_ants()):
         ax = axes.flatten()[i]
-        ax.semilogy(F.delays, np.abs(np.squeeze(F.avg_fft[abl])))
-        ax.set_title(abl)
+        for ip, pol in enumerate(uvd.get_pols()):
+            abl = (ant, ant, pol)
+            ax.semilogy(F.delays, np.abs(np.squeeze(F.avg_fft[abl])), label=pol, color=f'C{ip}')
+        ax.set_title(f'({ant}, {ant})')
         ax.grid()
         if i % ncol == 0:
             ax.set_xlabel(r'Delay [ns]')
@@ -521,8 +523,9 @@ def autocorr_visibilities_per_antenna(dic, fig_folder):
             ax.set_ylabel(r'$\vert \widetilde{V}_{ii} \vert$  [Jy Hz]')
     for i in np.arange(ncol * nrow % len(dic['antenna_nums'])):
         axes.flatten()[-i-1].set_visible(False)
+    axes[0].legend()
     fig.tight_layout()
-    fig_name = f'autocorr_visibilities_{dic["instrument"]}_{pyuvdata.utils.polnum2str(dic["pol"])}.png'
+    fig_name = f'autocorr_visibilities_{dic["instrument"]}.png'
     fig.savefig(fig_folder / fig_name, dpi=300)
     plt.close()
 
