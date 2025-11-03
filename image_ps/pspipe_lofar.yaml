@@ -1,6 +1,6 @@
 datafolder : '../../data/'
 datafile : 'L253456_SAP000_002_time1.flagged.5ch8s.dical.MS'
-instrument : 'lofar'
+data_col : 'DATA'
 
 # The polarizations numbers to include when reading data into the object
 pol : 'XX'
@@ -9,5 +9,5 @@ time_range : None
 # The range of frequencies to include when reading data into the object (min and max only), in MHz.
 freq_range : [100, 200]
 # The antennas numbers to include when reading data into the object. If None, all antennas are considered.
-antenna_nums : None
-data_col : 'DATA'
+# The maximum baseline length to consider (in meters)
+max_bl_len : 100.
