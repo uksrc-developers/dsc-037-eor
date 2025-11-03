@@ -532,7 +532,6 @@ def autocorr_visibilities_per_antenna(dic, fig_folder):
     fig.tight_layout()
     fig_name = f'autocorr_visibilities_{dic["instrument"]}.png'
     fig.savefig(fig_folder / fig_name, dpi=300)
-    plt.close()
 
 
 @click.command()
