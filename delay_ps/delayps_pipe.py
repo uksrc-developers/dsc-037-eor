@@ -29,6 +29,7 @@ from pathlib import Path
 import yaml
 
 import hera_pspec as hp
+from hera_cal.frf import FRFilter
 import pyuvdata
 from casacore.tables import table
 from astropy.coordinates import EarthLocation
@@ -291,6 +292,8 @@ def bl_avg_delayps_per_antenna(dic, fig_folder):
     # load whole dataset
     # create UVData object and read in data
     uvd = load_data(dic, read_data=True)
+    # ignore auto-correlation visibilities
+    uvd.select(ant_str='cross')
 
     # Build delay power spectra, but only for baselines including a specific antenna.
     # loop over antennas to build delay power spectra
@@ -400,6 +403,8 @@ def time_average_delayps_across_blens(dic, fig_folder, bl_tol=1., verbose=False)
     # load whole dataset
     # create UVData object and read in data
     uvd = load_data(dic, read_data=True)
+    # ignore auto-correlation visibilities
+    uvd.select(ant_str='cross')
 
     # Coherent time average of visibilities
     # TODO: temporary fix whilst waiting for pyuvdata issue to be resolved
@@ -454,6 +459,68 @@ def time_average_delayps_across_blens(dic, fig_folder, bl_tol=1., verbose=False)
     fig.savefig(fig_folder / fig_name, dpi=300)
 
 
+def autocorr_visibilities_per_antenna(dic, fig_folder):
+    """
+    Compute time-averaged delay auto-correlation visibilities
+    using the `pyuvdata` and `hera_cal` packages
+
+    Parameters
+    ----------
+        dic: dict
+            Dictionary containing relevant information about data and analysis choices.
+        fig_folder: Path
+            Path to folder where to save figures.
+
+    """
+
+    # load whole dataset
+    # create UVData object and read in data
+    uvd = load_data(dic, read_data=True)
+
+    # select auto-correlation data
+    uvd.select(ant_str='auto')
+
+    # only select required antennas in dataset
+    if len(dic['antenna_nums']) < len(uvd.get_ants()):
+        ant_str = ''
+        for i, an in enumerate(dic['antenna_nums']):
+            ant_str += str(an)
+            if i < len(dic['antenna_nums']) -1:
+                ant_str += ','
+        uvd.select(ant_str=ant_str)
+
+    # define a filter object from hera_cal
+    F = FRFilter(uvd)
+    # Coherent time average of visibilities
+    F.timeavg_data(F.data, F.times, F.lsts, flags=F.flags, t_avg=1e10, overwrite=True)
+    # Fourier transform the data to get delay visibilities
+    F.fft_data(
+        data=F.avg_data, flags=F.avg_flags, assign='avg_fft', ax='freq', window='bh', 
+        # edgecut_low=ecf_low, edgecut_hi=ecf_high, 
+        overwrite=True
+    )
+
+    # Gather the results in a figure
+    ncol = 10
+    nrow = np.ceil(len(dic['antenna_nums'])/ncol).astype(int)
+    fig, axes = plt.subplots(nrow, ncol, figsize=(20, 2*nrow), sharex=True, sharey=True)
+    for i, abl in enumerate(F.data):
+        ax = axes.flatten()[i]
+        ax.semilogy(F.delays, np.abs(np.squeeze(F.avg_fft[abl])))
+        ax.set_title(abl)
+        ax.grid()
+        if i % ncol == 0:
+            ax.set_xlabel(r'Delay [ns]')
+        if i >= (nrow-1)*ncol:
+            ax.set_ylabel(r'$\vert \widetilde{V}_{ii} \vert$  [Jy Hz]')
+    for i in np.arange(ncol * nrow % len(dic['antenna_nums'])):
+        axes.flatten()[-i-1].set_visible(False)
+    fig.tight_layout()
+    fig_name = f'autocorr_visibilities_{dic["instrument"]}_{pyuvdata.utils.polnum2str(dic["pol"])}.png'
+    fig.savefig(fig_folder / fig_name, dpi=300)
+    plt.close()
+
+
 @click.command()
 @click.argument("config_file", type=click.Path(exists=True))
 def main(config_file):
@@ -474,6 +541,9 @@ def main(config_file):
 
     # Compute a time-averaged delay power spectrum across redundant baselines
     time_average_delayps_across_blens(dic, root, bl_tol=1., verbose=True)
+
+    # Compute time-averaged delay visibilities for auto-correlations
+    autocorr_visibilities_per_antenna(dic, root)
 
 
 if __name__ == "__main__":
