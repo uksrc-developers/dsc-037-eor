@@ -3,12 +3,12 @@ datafile : 'hyp_1184702048_ionosub_ssins_30l_src8k_300it_8s_80kHz_i1000.uvfits'
 data_col : None
 
 # The polarizations numbers to include when reading data into the object
-pol : -5
+pol : [-5, -6]
 # The time range in Julian Date to include when reading data into the object, must be length 2. If None, all times in datafile are used.
 time_range : None
 # The indices describing the range of frequencies to include (min and max only).
 freq_range : [100, 200]
 # The antennas numbers to include when reading data into the object. If None, all antennas are considered.
-antenna_nums : None
+antenna_nums : [9, 10] #None
 # The maximum baseline length to consider (in meters)
 max_bl_len : 30.

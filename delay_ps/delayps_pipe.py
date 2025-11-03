@@ -67,9 +67,12 @@ def load_config(config_file, verbose=False):
 
     # Replace entries
     replace(cfg)
+    # check if there are several polarisations selected
+    cfg['pol'] = np.atleast_1d(cfg['pol'])
     # turn string pol to int
-    if isinstance(cfg['pol'], str):
-        cfg['pol'] = pyuvdata.utils.polstr2num(cfg['pol'])
+    for i, p in enumerate(cfg['pol']):
+        if isinstance(p, str):
+            cfg['pol'][i] = pyuvdata.utils.polstr2num(p)
     # for measurement set, specify data column
     cfg['data_format'] = os.path.splitext(cfg['datafile'])[-1][1:]
     if cfg['data_col'] is None:
@@ -113,7 +116,7 @@ def load_config(config_file, verbose=False):
         print('Required configuration:')
         print(f' Selected frequency range: {frequencies} MHz,'
               f' corresponding to average redshift of {cfg["avg_z"]:.1f}.')
-        print(f' Selected polarization: {cfg["pol"]} ({pyuvdata.utils.polnum2str(cfg["pol"])})')
+        print(f' Selected polarization: {cfg["pol"]} ({[pyuvdata.utils.polnum2str(p) for p in cfg["pol"]]})')
         print(f' Selected antennas: {cfg["antenna_nums"]}')
 
     return cfg
@@ -268,7 +271,7 @@ def load_data(dic, read_data=True):
         )
     uvd.check()
     uvd.select(
-        polarizations=[dic['pol']],
+        polarizations=dic['pol'],
         time_range=dic['time_range'],
         inplace=True
     )
@@ -294,41 +297,42 @@ def bl_avg_delayps_per_antenna(dic, fig_folder):
 
     # Build delay power spectra, but only for baselines including a specific antenna.
     # loop over antennas to build delay power spectra
-    data_time_avg = np.zeros((len(dic['antenna_nums']), np.diff(dic['freq_range'])[0]//2-1))
-    data_per_antenna = np.zeros((len(dic['antenna_nums']), dic['Ntimes'], np.diff(dic['freq_range'])[0]//2-1))
-    for u, antenna_num in enumerate(tqdm(dic['antenna_nums'])):
+    data_time_avg = np.zeros((len(dic['pol']), len(dic['antenna_nums']), np.diff(dic['freq_range'])[0]//2-1))
+    data_per_antenna = np.zeros((len(dic['pol']), len(dic['antenna_nums']), dic['Ntimes'], np.diff(dic['freq_range'])[0]//2-1))
+    for ip, pol in enumerate(dic['pol']):
+        for u, antenna_num in enumerate(tqdm(dic['antenna_nums'])):
 
-        # selection when reading data not available for MS
-        # select data for a single antenna
-        uvd_loc = uvd.select(
-            ant_str=f'{antenna_num}',
-            inplace=False
-        )
-        # average over all the baselines including said antenna
-        uvd_loc.compress_by_redundancy(tol=100000., use_grid_alg=True)
-        # Create a new PSpecData object which will be used to compute the delay PS
-        ds = hp.PSpecData(dsets=[uvd_loc, uvd_loc], wgts=[None, None], beam=None)
-        # in the baseline-averaged dataset, there is only one baseline left (the first one)
-        bl = uvd_loc.baseline_to_antnums(uvd_loc.baseline_array[0])
-        # build time-averaged delay ps from pairing the baseline with itself
-        uvp = ds.pspec(
-            [bl], [bl],  # select the baselines to cross (here, with itself)
-            dsets=(0, 1),  # select which datasets to use within ds
-            pols=[(dic['pol'], dic['pol'])],  # select the polarisation channels to cross
-            spw_ranges=[tuple(dic['freq_range'])],  # select a smaller bandwidth
-            verbose=False
-        )
-        # save time array for per-antenna figure
-        if u == 0:
-            time_array = Time(uvp.time_avg_array, format='jd')
-        # fold spectrum over the delay axis
-        hp.grouping.fold_spectra(uvp)
-        # save delay power spectrum per antenna, as a function of time and delay
-        data_per_antenna[u] = np.abs(uvp.data_array[0][:, -uvp.get_dlys(0).size:, 0])
-        # take time average of the data
-        uvp.average_spectra(time_avg=True, inplace=True)
-        # save time-averaged delay power spectrum per antenna
-        data_time_avg[u] = np.abs(uvp.data_array[0][0, -uvp.get_dlys(0).size:, 0])
+            # selection when reading data not available for MS
+            # select data for a single antenna
+            uvd_loc = uvd.select(
+                ant_str=f'{antenna_num}',
+                inplace=False
+            )
+            # average over all the baselines including said antenna
+            uvd_loc.compress_by_redundancy(tol=100000., use_grid_alg=True)
+            # Create a new PSpecData object which will be used to compute the delay PS
+            ds = hp.PSpecData(dsets=[uvd_loc, uvd_loc], wgts=[None, None], beam=None)
+            # in the baseline-averaged dataset, there is only one baseline left (the first one)
+            bl = uvd_loc.baseline_to_antnums(uvd_loc.baseline_array[0])
+            # build time-averaged delay ps from pairing the baseline with itself
+            uvp = ds.pspec(
+                [bl], [bl],  # select the baselines to cross (here, with itself)
+                dsets=(0, 1),  # select which datasets to use within ds
+                pols=[(pol, pol)],  # select the polarisation channels to cross
+                spw_ranges=[tuple(dic['freq_range'])],  # select a smaller bandwidth
+                verbose=False
+            )
+            # save time array for per-antenna figure
+            if u == 0:
+                time_array = Time(uvp.time_avg_array, format='jd')
+            # fold spectrum over the delay axis
+            hp.grouping.fold_spectra(uvp)
+            # save delay power spectrum per antenna, as a function of time and delay
+            data_per_antenna[ip, u] = np.abs(uvp.data_array[0][:, -uvp.get_dlys(0).size:, 0])
+            # take time average of the data
+            uvp.average_spectra(time_avg=True, inplace=True)
+            # save time-averaged delay power spectrum per antenna
+            data_time_avg[ip, u] = np.abs(uvp.data_array[0][0, -uvp.get_dlys(0).size:, 0])
     # define time array for per-antenna figure
     t_ref = Time(uvp.time_avg_array.min(), format='jd')
     time_array = (time_array - t_ref).to('s').value
@@ -338,48 +342,49 @@ def bl_avg_delayps_per_antenna(dic, fig_folder):
     vmin = np.percentile(np.abs(data_time_avg), 2)
     vmax = np.percentile(np.abs(data_time_avg), 98)
 
-    fig, ax = plt.subplots(1, 1, figsize=(15, 5))
-    im = ax.pcolormesh(
-        dic['antenna_nums'],
-        uvp.get_dlys(0)*1e6,
-        np.abs(data_time_avg).T,
-        cmap='Purples',
-        norm=colors.Normalize(vmin=vmin, vmax=vmax),
-    )
-    fig.colorbar(im, ax=ax, label=r'Power [Jy$^2$]')
-    ax.set_ylabel(r'Delay [$\mu$s]')
-    ax.set_xlabel('Antenna number')
-    fig.tight_layout()
-    fig_name1 = f'delay_ps_per_antenna_{dic["instrument"]}_{pyuvdata.utils.polnum2str(dic["pol"])}.png'
-    fig.savefig(fig_folder / fig_name1, dpi=300) 
-
-    # Gather the results in a figure showing the delay power spectrum as a function of time for each antenna, in order to identify which antenna is most impacted by cable reflections
-    ncol = 10
-    nrow = np.ceil(len(dic['antenna_nums'])/ncol).astype(int)
-
-    vmin = np.percentile(np.abs(data_per_antenna), 2)
-    vmax = np.percentile(np.abs(data_per_antenna), 98)
-
-    fig, axes = plt.subplots(nrow, ncol, figsize=(20, 2*nrow), sharex=True, sharey=True)
-    for i, antenna_num in enumerate(dic['antenna_nums']):
-        ax = axes.flatten()[i]
+    for ip, pol in enumerate(dic['pol']):
+        fig, ax = plt.subplots(1, 1, figsize=(15, 5))
         im = ax.pcolormesh(
-            time_array,
+            dic['antenna_nums'],
             uvp.get_dlys(0)*1e6,
-            np.abs(data_per_antenna[i]).T,
+            np.abs(data_time_avg[ip]).T,
             cmap='Purples',
             norm=colors.Normalize(vmin=vmin, vmax=vmax),
         )
-        ax.set_title(f'A{antenna_num}')
-        if i % ncol == 0:
-            ax.set_ylabel(r'Delay [$\mu$s]')
-        if i >= (nrow-1)*ncol:
-            ax.set_xlabel('Time [s]')
-    for i in np.arange(ncol * nrow % len(dic['antenna_nums'])):
-        axes.flatten()[-i-1].set_visible(False)
-    fig.tight_layout()
-    fig_name2 = f'delay_ps_per_antenna_vs_time_{dic["instrument"]}_{pyuvdata.utils.polnum2str(dic["pol"])}.png'
-    fig.savefig(fig_folder / fig_name2, dpi=300)
+        fig.colorbar(im, ax=ax, label=r'Power [Jy$^2$]')
+        ax.set_ylabel(r'Delay [$\mu$s]')
+        ax.set_xlabel('Antenna number')
+        fig.tight_layout()
+        fig_name1 = f'delay_ps_per_antenna_{dic["instrument"]}_{pyuvdata.utils.polnum2str(pol)}.png'
+        fig.savefig(fig_folder / fig_name1, dpi=300) 
+
+        # Gather the results in a figure showing the delay power spectrum as a function of time for each antenna, in order to identify which antenna is most impacted by cable reflections
+        ncol = 10
+        nrow = np.ceil(len(dic['antenna_nums'])/ncol).astype(int)
+
+        vmin = np.percentile(np.abs(data_per_antenna), 2)
+        vmax = np.percentile(np.abs(data_per_antenna), 98)
+
+        fig, axes = plt.subplots(nrow, ncol, figsize=(20, 2*nrow), sharex=True, sharey=True)
+        for i, antenna_num in enumerate(dic['antenna_nums']):
+            ax = axes.flatten()[i]
+            im = ax.pcolormesh(
+                time_array,
+                uvp.get_dlys(0)*1e6,
+                np.abs(data_per_antenna[ip, i]).T,
+                cmap='Purples',
+                norm=colors.Normalize(vmin=vmin, vmax=vmax),
+            )
+            ax.set_title(f'A{antenna_num}')
+            if i % ncol == 0:
+                ax.set_ylabel(r'Delay [$\mu$s]')
+            if i >= (nrow-1)*ncol:
+                ax.set_xlabel('Time [s]')
+        for i in np.arange(ncol * nrow % len(dic['antenna_nums'])):
+            axes.flatten()[-i-1].set_visible(False)
+        fig.tight_layout()
+        fig_name2 = f'delay_ps_per_antenna_vs_time_{dic["instrument"]}_{pyuvdata.utils.polnum2str(pol)}.png'
+        fig.savefig(fig_folder / fig_name2, dpi=300)
 
 
 def time_average_delayps_across_blens(dic, fig_folder, bl_tol=1., verbose=False):
@@ -423,35 +428,36 @@ def time_average_delayps_across_blens(dic, fig_folder, bl_tol=1., verbose=False)
     # Create a new PSpecData object which will be used to compute the delay PS
     ds = hp.PSpecData(dsets=[uvd, uvd], wgts=[None, None], beam=None)
     # build delay ps from baseline pairs constructed above
-    uvp = ds.pspec(
-        bls1, bls2,
-        dsets=(0, 1),
-        pols=[(dic['pol'], dic['pol'])],
-        spw_ranges=[tuple(dic['freq_range'])],  # select a smaller bandwidth
-        verbose=False
-    )
-    if dic['data_format'] in ['ms', 'MS']:
-        uvp.average_spectra(time_avg=True, inplace=True)
+    for ip, pol in enumerate(dic['pol']):
+        uvp = ds.pspec(
+            bls1, bls2,
+            dsets=(0, 1),
+            pols=[(pol, pol)],
+            spw_ranges=[tuple(dic['freq_range'])],  # select a smaller bandwidth
+            verbose=False
+        )
+        if dic['data_format'] in ['ms', 'MS']:
+            uvp.average_spectra(time_avg=True, inplace=True)
+        dat = np.copy(uvp.data_array[0][:, :, 0])
 
-    # plot
-    dat = np.copy(uvp.data_array[0][:, :, 0])
-    vmin = np.percentile(abs(dat), 2)
-    vmax = np.percentile(abs(dat), 98)
+        # plot
+        vmin = np.percentile(abs(dat), 2)
+        vmax = np.percentile(abs(dat), 98)
 
-    fig, ax = plt.subplots(1, 1)
-    im = ax.pcolormesh(
-        uvp.dly_array*1e6,
-        np.take(red_lens, red_groups),
-        np.abs(dat),
-        cmap='Purples',
-        norm=colors.LogNorm(vmin=vmin, vmax=vmax),
-    )
-    fig.colorbar(im, ax=ax, label=f'Delay PS')
-    ax.set_xlabel(r'Delay [$\mu$s]')
-    ax.set_ylabel('Baseline length [m]')
-    fig.tight_layout()
-    fig_name = f'bl-avg_delay_ps_across_blens_{dic["instrument"]}_{pyuvdata.utils.polnum2str(dic["pol"])}.png'
-    fig.savefig(fig_folder / fig_name, dpi=300)
+        fig, ax = plt.subplots(1, 1)
+        im = ax.pcolormesh(
+            uvp.dly_array*1e6,
+            np.take(red_lens, red_groups),
+            np.abs(dat),
+            cmap='Purples',
+            norm=colors.LogNorm(vmin=vmin, vmax=vmax),
+        )
+        fig.colorbar(im, ax=ax, label=f'Delay PS')
+        ax.set_xlabel(r'Delay [$\mu$s]')
+        ax.set_ylabel('Baseline length [m]')
+        fig.tight_layout()
+        fig_name = f'bl-avg_delay_ps_across_blens_{dic["instrument"]}_{pyuvdata.utils.polnum2str(pol)}.png'
+        fig.savefig(fig_folder / fig_name, dpi=300)
 
 
 @click.command()
