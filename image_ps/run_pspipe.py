@@ -122,12 +122,32 @@ def main(config_file):
 
     # Apply modifiers
     c_start, c_end = freq_range
+    fmhz = get_ms_freqs(ms_path)[1]
+    freqs, _ = get_ms_freqs(str(ms_path))
+    freqs_mhz = freqs / 1e6
+    fmin = freqs_mhz[c_start]
+    fmax = freqs_mhz[c_end]
+
+    if c_end == 0:
+        c_end = len(freqs)
+    c_out = c_end - c_start
 
     pol_clean = "".join(pol.replace(" ", "").split(",")) if isinstance(pol, str) else "".join(pol)
+
+    # --- Print main parameters ---
+    click.echo("\n--- Main parameters ---")
+    click.echo(f"Measurement Set path  : {ms_path}")
+    click.echo(f"Telescope             : {telescope.lower()}")
+    click.echo(f"Observation ID        : {obs_id}")
+    click.echo(f"Polarisation(s)       : {pol_clean}")
+    click.echo(f"Frequency range (MHz) : {fmin:.2f} – {fmax:.2f}")
+    click.echo(f"Channel range         : {c_start} – {c_end}  ({c_out} channels)")
+    click.echo("------------------------\n")
 
     modifiers = [
         f"\"image.data_col='{data_col}'\"",
         f"\"image.wsclean_args.channel-range='{c_start} {c_end}'\"",
+        f"\"image.channels_out='{c_out}'\"",
         f"\"image.stokes='{pol_clean}'\"",
     ]
     run_cmd(f"psdb clone {template_toml} data_dir {' '.join(modifiers)}")
@@ -140,7 +160,6 @@ def main(config_file):
     run_cmd(f"pspipe image,gen_vis_cube {rev_toml} {obs_id}")
 
     make_ps = Path(__file__).resolve().parent / "make_ps.py"
-    fmin, fmax = freq_range
     run_cmd(f"{make_ps} {rev_toml} {obs_id} --fmin {fmin} --fmax {fmax} --pol {pol}")
 
 

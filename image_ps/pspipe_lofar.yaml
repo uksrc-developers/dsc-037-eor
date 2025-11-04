@@ -4,10 +4,5 @@ data_col : 'DATA'
 
 # The polarizations numbers to include when reading data into the object
 pol : 'XX'
-# The time range in Julian Date to include when reading data into the object, must be length 2. If None, all times in datafile are used.
-time_range : None
 # The range of frequencies to include when reading data into the object (min and max only), in MHz.
 freq_range : [100, 200]
-# The antennas numbers to include when reading data into the object. If None, all antennas are considered.
-# The maximum baseline length to consider (in meters)
-max_bl_len : 100.
