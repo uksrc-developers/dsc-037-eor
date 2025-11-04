@@ -71,9 +71,7 @@ def load_config(config_file, verbose=False):
     # check if there are several polarisations selected
     cfg['pol'] = np.atleast_1d(cfg['pol'])
     # turn string pol to int
-    for i, p in enumerate(cfg['pol']):
-        if isinstance(p, str):
-            cfg['pol'][i] = pyuvdata.utils.polstr2num(p)
+    cfg['pol'] = [pyuvdata.utils.polstr2num(p) if isinstance(p, str) else p for p in cfg['pol']]
     # for measurement set, specify data column
     cfg['data_format'] = os.path.splitext(cfg['datafile'])[-1][1:]
     if cfg['data_col'] is None:
