@@ -11,9 +11,9 @@ ant1: "2"  # Antenna 1 (name or index)
 ant2: "6"  # Antenna 2 (name or index)
 
 # Optional common parameters
-input_file: "L253456_SAP000_002_time1.flagged.5ch8s.dical.MS"  # Input file path (MS, UVFITS, or FITS format) (optional, can be overridden in notebooks)
-#input_file: "hyp_1184702048_ionosub_ssins_30l_src8k_300it_8s_80kHz_i1000.uvfits"  # Input file path (MS, UVFITS, or FITS format) (optional, can be overridden in notebooks)
-corr: "XX"  # Polarization: XX, YY, XY, YX, nn, ee, etc. (optional)
+# input_file: "L253456_SAP000_002_time1.flagged.5ch8s.dical.MS"  # Input file path (MS, UVFITS, or FITS format) (optional, can be overridden in notebooks)
+input_file: "hyp_1184702048_ionosub_ssins_30l_src8k_300it_8s_80kHz_i1000.uvfits"  # Input file path (MS, UVFITS, or FITS format) (optional, can be overridden in notebooks)
+corr: "XY"  # Polarization: XX, YY, XY, YX, nn, ee, etc. (optional)
 col: "DATA"  # Column: DATA, CORRECTED_DATA, MODEL_DATA (optional)
 outdir: "./"  # Output directory for plots (optional)
 timebin: 1  # Time binning factor (optional)
@@ -30,5 +30,5 @@ vmin: null  # (Optional) color min for |FFT|/|FFT|^2 pages
 vmax: null  # (Optional) color max for |FFT|/|FFT|^2 pages
 no_log: false  # Disable log color for |FFT| and |FFT|^2 pages (optional)
 plot_title_base: "Delay–Time Waterfall"  # Base title for plots (optional)
-out_file: "delay_waterfall_full.pdf"  # Output filename for PDF (optional)
-show: true  # Display plots inline (optional)
+out_file: "delay_waterfall_full.pdf"
+show: True # Display plots inline but do not save to file (optional)
