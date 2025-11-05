@@ -6,7 +6,7 @@ This script plots visibility amplitude/phase vs time/frequency from either:
 1. LOFAR Measurement Set (MS) format (using casacore)
 2. UVFITS or other formats (using pyuvdata)
 
-Author: Zhenghao Zhu and Linhui Wu
+Author: Shao EOR Group and Teal Team
 Dependencies: casacore, pyuvdata, numpy, matplotlib, astropy
 Last updated: 2025-10-17
 """
