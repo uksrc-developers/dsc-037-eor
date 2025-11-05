@@ -31,4 +31,4 @@ vmax: null  # (Optional) color max for |FFT|/|FFT|^2 pages
 no_log: false  # Disable log color for |FFT| and |FFT|^2 pages (optional)
 plot_title_base: "Delay–Time Waterfall"  # Base title for plots (optional)
 out_file: "delay_waterfall_full.pdf"
-show: True # Display plots inline but do not save to file (optional)
+show: true # Display plots inline but do not save to file (optional)
