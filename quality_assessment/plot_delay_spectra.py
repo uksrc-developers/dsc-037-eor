@@ -10,6 +10,9 @@ Also prints delay spectrum statistics (max, mean, median, total power, peak dela
 Supports:
   - Measurement Sets (.MS) via casacore.tables
   - UVFITS via pyuvdata
+
+Authors:
+  - Shao EoR Group and Teal Team
 """
 
 import os
