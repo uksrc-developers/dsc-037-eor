@@ -250,12 +250,22 @@ def process_ms(ms_path, ant1, ant2, corr, col, timebin, chanbin, use_weights, ch
     if nrows == 0:
         q.close()
         t.close()
-        raise RuntimeError(f"No data found for antenna pair {ant1_name} ({a_lo}), {ant2_name} ({a_hi})")
-    print(f"[INFO] Found {nrows} rows for antenna pair {ant1_name} ({a_lo}), {ant2_name} ({a_hi})")
+        raise RuntimeError(f"No data found for antenna pair {ant1_name} ({a_lo}), {ant2_name} ({a_hi})")                                                        
+    print(f"[INFO] Found {nrows} rows for antenna pair {ant1_name} ({a_lo}), {ant2_name} ({a_hi})")                                                             
     
     ddid = ensure_single_ddid_ms(q)
     freq_mhz = get_freq_axis_ms(ms, ddid)
     nchan = freq_mhz.size
+    
+    # Apply channel binning to frequency axis before the loop
+    if chanbin > 1:
+        new_nchan = (nchan // chanbin) * chanbin
+        if new_nchan < chanbin:
+            q.close()
+            t.close()
+            raise RuntimeError("chanbin too large for available channels")
+        freq_mhz = freq_mhz[:new_nchan].reshape(-1, chanbin).mean(axis=1)
+        nchan = freq_mhz.size  # Update nchan to binned size
     
     times_all = []
     amp_time = []
@@ -273,17 +283,18 @@ def process_ms(ms_path, ant1, ant2, corr, col, timebin, chanbin, use_weights, ch
         nr = min(step, nrows - start)
         data = q.getcol(col, startrow=start, nrow=nr)  # shape [nr,nchan,ncorr]
         times = q.getcol('TIME', startrow=start, nrow=nr)  # shape [nr]
-        flags = q.getcol('FLAG', startrow=start, nrow=nr) if have_flags else np.zeros(data.shape, dtype=bool)
+        flags = q.getcol('FLAG', startrow=start, nrow=nr) if have_flags else np.zeros(data.shape, dtype=bool)                                                   
         
         if data.ndim != 3 or data.shape[2] <= corr_idx:
             q.close()
             t.close()
-            raise RuntimeError(f"Data column {col} has unexpected shape {data.shape} (need ncorr > {corr_idx})")
+            raise RuntimeError(f"Data column {col} has unexpected shape {data.shape} (need ncorr > {corr_idx})")                                                
         
         v = data[:, :, corr_idx]
         f = flags[:, :, corr_idx] if flags.ndim == 3 else flags
         
         if chanbin > 1:
+            # Use the same new_nchan that was calculated above
             new_nchan = (v.shape[1] // chanbin) * chanbin
             v = v[:, :new_nchan]
             f = f[:, :new_nchan]
@@ -309,6 +320,11 @@ def process_ms(ms_path, ant1, ant2, corr, col, timebin, chanbin, use_weights, ch
         amp_chunk = np.abs(v)
         if have_ws:
             ws = q.getcol('WEIGHT_SPECTRUM', startrow=start, nrow=nr)[:, :, corr_idx]
+            # Apply channel binning to weights if needed
+            if chanbin > 1:
+                new_nchan = (ws.shape[1] // chanbin) * chanbin
+                ws = ws[:, :new_nchan]
+                ws = ws.reshape(ws.shape[0], -1, chanbin).mean(axis=2)
             ws = np.where(np.isfinite(amp_chunk), ws, 0.0)
             amp_sum += np.nansum(amp_chunk * ws, axis=0)
             amp_wsum += np.nansum(ws, axis=0)
@@ -322,6 +338,11 @@ def process_ms(ms_path, ant1, ant2, corr, col, timebin, chanbin, use_weights, ch
         unit[~np.isfinite(unit)] = np.nan + 1j*np.nan
         if have_ws:
             ws = q.getcol('WEIGHT_SPECTRUM', startrow=start, nrow=nr)[:, :, corr_idx]
+            # Apply channel binning to weights if needed
+            if chanbin > 1:
+                new_nchan = (ws.shape[1] // chanbin) * chanbin
+                ws = ws[:, :new_nchan]
+                ws = ws.reshape(ws.shape[0], -1, chanbin).mean(axis=2)
             ws = np.where(np.isfinite(unit.real), ws, 0.0)
             phs_vec_sum += np.nansum(unit * ws, axis=0)
             phs_wsum += np.nansum(ws, axis=0)
@@ -417,6 +438,8 @@ def process_uvfits(uvfits_path, ant1, ant2, pol, col, timebin, chanbin, use_weig
         v = v[:, :new_nchan].reshape(v.shape[0], -1, chanbin).mean(axis=2)
         f = f[:, :new_nchan].reshape(f.shape[0], -1, chanbin).any(axis=2)
         w = w[:, :new_nchan].reshape(w.shape[0], -1, chanbin).mean(axis=2)
+        # Also bin the frequency axis to match the binned data
+        freq_mhz = freq_mhz[:new_nchan].reshape(-1, chanbin).mean(axis=1)
     
     # Mask flagged data
     v_masked = np.where(~f, v, np.nan + 1j*np.nan)
@@ -749,7 +772,6 @@ def run_processing_and_plotting(config_file='config.yaml', input_file=None, ant1
         print(f"PHASE freq RMS (rad) after linear detrend: {results['phs_freq_rms']:.3f}")
         print("===================\n")
         
-        print("read out showing plots", show)
         # Save plots
         f1, f2, f3, f4 = plot_or_save_plots(results, outdir, show=show)
         if show:
@@ -820,7 +842,6 @@ Examples:
                         help="Show plots interactively instead of saving PNGs. "
                              "Use --show (True) or --show False. If not specified, uses config.yaml value.")
     args = parser.parse_args()
-    print("args.show", args.show)
     # Convert command line arguments to function parameters (None means use config)
     # Handle ant1 and ant2 - convert string to int if possible, otherwise keep as string
     ant1_arg = None
