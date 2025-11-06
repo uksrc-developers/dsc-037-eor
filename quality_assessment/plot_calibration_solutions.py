@@ -7,6 +7,9 @@ This script plots calibration solutions (amplitude and phase) vs frequency for e
 Authors: Shao EoR Group and Teal Team
 Dependencies: numpy, matplotlib, astropy
 Last updated: 2025-01-XX
+
+The calibration solution file hyp_soln_1184702048_ssins_30l_src8k_300it.fits used in this code 
+was provided by Hyperdrive, courtesy of Dev Null.
 """
 
 import os

@@ -9,6 +9,8 @@ This script plots visibility amplitude/phase vs time/frequency from either:
 Author: Shao EOR Group and Teal Team
 Dependencies: casacore, pyuvdata, numpy, matplotlib, astropy
 Last updated: 2025-10-17
+The input UV fits data file hyp_1184702048_ionosub_ssins_30l_src8k_300it_8s_80kHz_i1000.uvfits used in this code 
+was provided by Hyperdrive, courtesy of Dev Null.
 """
 
 import os

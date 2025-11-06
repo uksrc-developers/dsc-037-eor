@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Delay–time dynamic spectrum (waterfall) with three outputs in a single PDF:
+Delay–time dynamic spectrum (waterfall) with three outputs:
   Page 1: Raw FFT (two subplots) -> log(|FFT|) and Phase ∠FFT
   Page 2: |FFT|
   Page 3: |FFT|²
@@ -13,6 +13,9 @@ Supports:
 
 Authors:
   - Shao EoR Group and Teal Team
+
+The input UV fits data file hyp_1184702048_ionosub_ssins_30l_src8k_300it_8s_80kHz_i1000.uvfits used in this code 
+was provided by Hyperdrive, courtesy of Dev Null.
 """
 
 import os
