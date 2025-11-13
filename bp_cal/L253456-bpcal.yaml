@@ -1,0 +1,23 @@
+# ------------------------------------------------------------
+# DSC-037 Bandpass Calibration Configuration
+# ------------------------------------------------------------
+
+# --- Input MS ---
+datafolder: "../data/"
+datafile: "L253456_SAP000_002_time1.flagged.5ch8s.dical.MS"
+
+# --- DP3 data columns ---
+input_datacol: "DATA"
+output_datacol: "BP_CORRECTED"
+
+# --- Sky model ---
+skymodelfile: "../data/skymodels/L253456_DI_10mJy.txt"
+
+# --- Baseline selection (wavelengths) ---
+min_bl_len: 50.
+max_bl_len: 5000.
+
+# --- Averaging & solution interval ---
+avg_time_step: 4          # time averaging step in DP3 Averager
+time_sol_int: 450         # DP3 solint for gaincal
+
