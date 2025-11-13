@@ -82,21 +82,28 @@ def load_config(config_file):
     return cfg
 
 
-def make_run_dir():
-    """Create a new working directory (pspipe_workdir_i) and switch to it."""
-    i = 1
-    while True:
-        run_dir = Path(f"pspipe_workdir_{i}")
-        if not run_dir.exists():
-            run_dir.mkdir()
-            os.chdir(run_dir)
-            return run_dir
-        i += 1
+def make_run_dir(config_path, workdir=None):
+    """Create or use a working directory based on the config filename.
+    If a directory already exists, append _i automatically."""
+    if workdir:
+        run_dir = Path(workdir)
+    else:
+        base_name = Path(config_path).stem
+        run_dir = Path(f"{base_name}")
+        i = 1
+        while run_dir.exists():
+            run_dir = Path(f"{base_name}_{i}")
+            i += 1
+    run_dir.mkdir(parents=True, exist_ok=True)
+    os.chdir(run_dir)
+    click.echo(f"Working directory set to: {run_dir}")
+    return run_dir
 
 
 @click.command()
 @click.argument("config_file", type=click.Path(exists=True))
-def main(config_file):
+@click.option("--workdir", "-w", type=click.Path(), help="Optional working directory.")
+def main(config_file, workdir):
     """Run the pspipe workflow for the dataset described in CONFIG_FILE."""
     config_path = Path(config_file).resolve()
     root = config_path.parent
@@ -113,7 +120,7 @@ def main(config_file):
         raise click.ClickException(f"Invalid Measurement Set path: {ms_path}")
 
     telescope = get_telescope_name(ms_path)
-    run_dir = make_run_dir()
+    run_dir = make_run_dir(config_path, workdir)
     click.echo(f"Working in {run_dir}")
 
     obs_id = ms_path.stem
@@ -122,17 +129,20 @@ def main(config_file):
 
     # Apply modifiers
     c_start, c_end = freq_range
-    fmhz = get_ms_freqs(ms_path)[1]
     freqs, _ = get_ms_freqs(str(ms_path))
     freqs_mhz = freqs / 1e6
+
+    if c_end == 0:
+        c_end = len(freqs) - 1
+    c_out = c_end - c_start
+
     fmin = freqs_mhz[c_start]
     fmax = freqs_mhz[c_end]
 
-    if c_end == 0:
-        c_end = len(freqs)
-    c_out = c_end - c_start
+    if isinstance(pol, str):
+        pol = pol.replace(" ", "").split(",")
 
-    pol_clean = "".join(pol.replace(" ", "").split(",")) if isinstance(pol, str) else "".join(pol)
+    pol_clean = ",".join(pol)
 
     # --- Print main parameters ---
     click.echo("\n--- Main parameters ---")
@@ -148,7 +158,7 @@ def main(config_file):
         f"\"image.data_col='{data_col}'\"",
         f"\"image.wsclean_args.channel-range='{c_start} {c_end}'\"",
         f"\"image.channels_out='{c_out}'\"",
-        f"\"image.stokes='{pol_clean}'\"",
+        f"\"image.stokes='{pol_clean.replace(',', '')}'\"",
     ]
     run_cmd(f"psdb clone {template_toml} data_dir {' '.join(modifiers)}")
 
@@ -160,7 +170,7 @@ def main(config_file):
     run_cmd(f"pspipe image,gen_vis_cube {rev_toml} {obs_id}")
 
     make_ps = Path(__file__).resolve().parent / "make_ps.py"
-    run_cmd(f"{make_ps} {rev_toml} {obs_id} --fmin {fmin} --fmax {fmax} --pol {pol}")
+    run_cmd(f"{make_ps} {rev_toml} {obs_id} --fmin {fmin} --fmax {fmax} --pol {pol_clean}")
 
 
 if __name__ == "__main__":
